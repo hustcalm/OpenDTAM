@@ -59,7 +59,7 @@ CostVolume::CostVolume(Mat image, FrameID _fid, int _layers, float _near,
 
     //For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
     CV_Assert(image.rows % 32 == 0 && image.cols % 32 == 0 && image.cols >= 64);
-    CV_Assert(_layers>=8);
+    CV_Assert(_layers >= 8);
     
     checkInputs(R, T, _cameraMatrix);
     fid           = _fid;
@@ -79,8 +79,8 @@ CostVolume::CostVolume(Mat image, FrameID _fid, int _layers, float _near,
     GpuMat tmp;
     baseImage.upload(image.reshape(0,1));
     cvtColor(baseImage,baseImageGray,CV_RGB2GRAY);
-    baseImage=baseImage.reshape(0,rows);
-    baseImageGray=baseImageGray.reshape(0,rows);
+    baseImage = baseImage.reshape(0,rows);
+    baseImageGray = baseImageGray.reshape(0,rows);
     cvStream.enqueueMemSet(loInd,0.0);
     cvStream.enqueueMemSet(dataContainer,initialCost);
     data = (float*) dataContainer.data;
@@ -90,14 +90,11 @@ CostVolume::CostVolume(Mat image, FrameID _fid, int _layers, float _near,
     count = 0;
     
     //messy way to disguise cuda objects
-    _cuArray=Ptr<char>((char*)(new cudaArray*));
-    *((cudaArray**)(char*)_cuArray)=0;
-    _texObj=Ptr<char>((char*)(new cudaTextureObject_t));
-    *((cudaTextureObject_t*)(char*)_texObj)=0;
-    
+    _cuArray = Ptr<char>((char*)(new cudaArray*));
+    *((cudaArray**)(char*)_cuArray) = 0;
+    _texObj = Ptr<char>((char*)(new cudaTextureObject_t));
+    *((cudaTextureObject_t*)(char*)_texObj) = 0;
 }
-
-
 
 // static cudaArray* cuArray=0;
 // static cudaTextureObject_t texObj=0;
@@ -112,7 +109,7 @@ void CostVolume::simpleTex(const Mat& image,Stream cvStream){
 //     }
 //     cudaTextureObject_t texObj=*(cudaTextureObject_t*)(char*)_texObj;
     assert(image.isContinuous());
-    assert(image.type()==CV_8UC4);
+    assert(image.type() == CV_8UC4);
     
     //Describe texture
     struct cudaTextureDesc texDesc;
@@ -272,7 +269,6 @@ void CostVolume::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& 
 
 }
 
-
 CostVolume::~CostVolume(){
     cudaArray*& cuArray=*((cudaArray**)(char*)_cuArray);
     cudaTextureObject_t& texObj=*((cudaTextureObject_t*)(char*)_texObj);
@@ -284,4 +280,3 @@ CostVolume::~CostVolume(){
     }
     
 }
-
