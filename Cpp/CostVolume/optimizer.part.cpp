@@ -78,10 +78,10 @@ void Cost::cacheGValues(){
     int w=cols;
     int h=rows;
     cout<< "Caching G values"<<"\n";
-    _gbig.create(h+2,w,CV_32FC1);  //enough room to safely read off the ends
+    _gbig.create(h+2, w, CV_32FC1);  //enough room to safely read off the ends
                                 // data will be garbage, but we don't care since we don't use it anyway
-    _g=Mat(h,w,CV_32FC1, (float*)(_gbig.data)+w);
-    _gu.create(h,w,CV_32FC1);//if we read/write off the end of these something is wrong.
+    _g = Mat(h, w, CV_32FC1, (float*)(_gbig.data) + w);
+    _gu.create(h,w,CV_32FC1); //if we read/write off the end of these something is wrong.
     _gd.create(h,w,CV_32FC1);
     _gl.create(h,w,CV_32FC1);
     _gr.create(h,w,CV_32FC1);
@@ -93,30 +93,39 @@ void Cost::cacheGValues(){
     float* gl=(float*)(_gl.data);
     float* gr=(float*)(_gr.data);
     Mat im_gray;
-    cvtColor(baseImage,im_gray,CV_RGB2GRAY);
+    cvtColor(baseImage, im_gray, CV_RGB2GRAY);
 
     //first get derivatives, but use the kind that we need for our purposes, rather than the built in scharr or sobel derivatives. We will do this by getting the absolute value of the differences to each side of the the current pixel and then taking the max along each direction. The 
     Mat gx,gy,g1,g2;
-    Mat kernel=(Mat_<float>(1,3)<<0.0,-1.0,1.0);
+
+    Mat kernel = (Mat_<float>(1,3)<<0.0,-1.0,1.0);
+    filter2D(im_gray, g1, -1, kernel); // (x,y+1) - (x,y)
     
-    filter2D(im_gray,g1,-1,kernel);
+    kernel = (Mat_<float>(1,3)<<-1.0,1.0,0.0);
+    filter2D(im_gray, g2, -1, kernel); // (x,y) - (x,y-1)
+
+    g1 = abs(g1);
+    g2 = abs(g2);
+    gx = cv::max(g1, g2); // horizontal max
     
-    kernel=(Mat_<float>(1,3)<<-1.0,1.0,0.0);
-    filter2D(im_gray,g2,-1,kernel);
-    g1=abs(g1);
-    g2=abs(g2);
-    gx=cv::max(g1,g2);
     
+    kernel = (Mat_<float>(3,1)<<0.0,-1.0,1.0); // (x+1,y) - (x,y)
+    filter2D(im_gray, g1, -1, kernel);
+    kernel = (Mat_<float>(3,1)<<-1.0,1.0,0.0); // (x,y) - (x-1,y)
+    filter2D(im_gray, g2, -1, kernel);
+
+    g1 = abs(g1);
+    g2 = abs(g2);
+    gy = cv::max(g1, g2); // vetical max
     
-    kernel=(Mat_<float>(3,1)<<0.0,-1.0,1.0);
-    filter2D(im_gray,g1,-1,kernel);
-    kernel=(Mat_<float>(3,1)<<-1.0,1.0,0.0);
-    filter2D(im_gray,g2,-1,kernel);
-    g1=abs(g1);
-    g2=abs(g2);
-    gy=cv::max(g1,g2);
-    
-    _g=gx+gy;//Getting lazy, just do L1 norm
+    _g = gx+gy; //Getting lazy, just do L1 norm
+
+    // The paper using L2 norm
+    for(int i = 0; i < gx.rows; ++i) {
+        for(int j = 0; j < gx.cols; ++j) {
+            _g[i][j] = sqrt(gx[i][j]*gx[i][j] + gy[i][j]*gy[i][j]);
+        }
+    }
     
     toc();
     //The g function (Eq. 5)
