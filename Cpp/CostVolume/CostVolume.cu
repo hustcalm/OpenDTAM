@@ -16,7 +16,7 @@ cudaStream_t localStream;
 #define BLOCK_X 64
 #define BLOCK_Y 4
 __global__ void globalWeightedBoundsCost(m34 p, float weight, CONSTT);
-void globalWeightedBoundsCostCaller(m34 p,float weight, CONSTT){
+void globalWeightedBoundsCostCaller(m34 p, float weight, CONSTT){
    dim3 dimBlock(BLOCK_X, BLOCK_Y);
    dim3 dimGrid((cols  + dimBlock.x - 1) / dimBlock.x,
                 (rows + dimBlock.y - 1) / dimBlock.y);
@@ -40,7 +40,7 @@ __global__ void globalWeightedBoundsCost(m34 p,float weight, CONSTT)
 
     float xf = x;
     float yf = y;
-    unsigned int offset = x + y*cols;
+    unsigned int offset = x + y*cols; // for each pixel
 //    unsigned int gindex=offset*3-2*threadIdx.x;
 //    const unsigned int mul=BLOCK_X;
 //    __shared__ float buff[BLOCK_X*BLOCK_Y*3];
@@ -53,12 +53,12 @@ __global__ void globalWeightedBoundsCost(m34 p,float weight, CONSTT)
 //    float3 B =((float3*)buff)[sooff];
 
 
-    float3 B = base[x + y*cols];//Known bug:this requires 12 loads instead of 4 because of stupid memory addressing, can't really fix
+    float3 B = base[x + y*cols]; //Known bug:this requires 12 loads instead of 4 because of stupid memory addressing, can't really fix
     float wi = p.data[8]*xf + p.data[9]*yf + p.data[11];
     float xi = (p.data[0]*xf + p.data[1]*yf + p.data[3]);
     float yi = (p.data[4]*xf + p.data[5]*yf + p.data[7]);
-    float minv=1000.0,maxv=0.0;
-    float mini=0;
+    float minv = 1000.0, maxv=0.0;
+    float mini = 0;
     for(unsigned int z = 0; z < layers; z++){
         float c0 = cdata[offset + z*layerStep];
         float wiz = wi + p.data[10]*z;
@@ -74,11 +74,12 @@ __global__ void globalWeightedBoundsCost(m34 p,float weight, CONSTT)
         minv = ns;
         mini = z;
         }
-        maxv=fmaxf(ns,maxv);
+        maxv = fmaxf(ns,maxv);
     }
-    lo[offset]=minv;
-    loInd[offset]=mini;
-    hi[offset]=maxv;
+
+    lo[offset] = minv;
+    loInd[offset] = mini;
+    hi[offset] = maxv;
 }
 
 

@@ -151,13 +151,16 @@ void DepthmapDenoiseWeightedHuberImpl::computeSigmas(float epsilon,float theta){
 
 void DepthmapDenoiseWeightedHuberImpl::cacheGValues(InputArray _visibleLightImage){
     using namespace cv::gpu::device::dtam_denoise;
+
     localStream = cv::gpu::StreamAccessor::getStream(cvStream);
+
     if (!_visibleLightImage.empty()){
-        visibleLightImage=_visibleLightImage.getGpuMat();
-        cachedG=0;
+        visibleLightImage = _visibleLightImage.getGpuMat();
+        cachedG = 0;
     }
     if(cachedG)
         return;//already cached
+
     if(!alloced)
         allocate(rows,cols);
 
@@ -172,7 +175,8 @@ void DepthmapDenoiseWeightedHuberImpl::cacheGValues(InputArray _visibleLightImag
     float* gxp = (float*)_gx.data;
     float* gyp = (float*)_gy.data;
     computeGCaller(pp,  g1p,  gxp,  gyp, cols);
-    cachedG=1;
+
+    cachedG = 1;
 }
 
 GpuMat DepthmapDenoiseWeightedHuberImpl::operator()(InputArray _ain, float epsilon,float theta){

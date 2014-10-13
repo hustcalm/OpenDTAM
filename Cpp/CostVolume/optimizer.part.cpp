@@ -118,12 +118,16 @@ void Cost::cacheGValues(){
     g2 = abs(g2);
     gy = cv::max(g1, g2); // vetical max
     
-    _g = gx+gy; //Getting lazy, just do L1 norm
+    //_g = gx+gy; //Getting lazy, just do L1 norm
 
     // The paper using L2 norm
     for(int i = 0; i < gx.rows; ++i) {
+        const float* Mx = gx.ptr<float>(i);
+        const float* My = gy.ptr<float>(i);
+        float* Mg = _g.ptr<float>(i);
+
         for(int j = 0; j < gx.cols; ++j) {
-            _g[i][j] = sqrt(gx[i][j]*gx[i][j] + gy[i][j]*gy[i][j]);
+            Mg[j] = sqrt(Mx[j]*Mx[j] + My[j]*My[j]);
         }
     }
     
@@ -133,27 +137,27 @@ void Cost::cacheGValues(){
     // so I have chosen them to have a knee at 10% gradient, since this is a 
     //good threshold for edge detectors.
 //     _g=2-_g;
-    sqrt(_g,_g);
+    sqrt(_g, _g); // beta as 1/2, using cv::sqrt
     
-    exp(-3*_g,_g);
+    exp(-3*_g, _g); // alpha as 3, using cv::exp
 //     _g=_g+epsilon;
 //     _g=1;
     
     //_g=_g*scale_g
 
     //cache interpreted forms of g, for the "matrix" used in
-    //section 2.2.3
+    //section 2.2.3, every point will be calculated
     st end=w*h;
-    for (st point=0; point<end; point++){
-        gu[here]= 0.5*(g[up]+   g[here]);
-        gd[here]=-0.5*(g[down]+ g[here]);
-        gl[here]= 0.5*(g[left ]+ g[here]);
-        gr[here]=-0.5*(g[right]+g[here]);
+    for (st point = 0; point < end; point++){
+        gu[here] =  0.5*(g[up]    +   g[here]);
+        gd[here] = -0.5*(g[down]  +   g[here]);
+        gl[here] =  0.5*(g[left]  +   g[here]);
+        gr[here] = -0.5*(g[right] +   g[here]);
     }
 
-    pfShow("g",_g,0,Vec2d(0,1));
-    
+    pfShow("g", _g, 0, Vec2d(0,1));
 }
+
 /*inline float Cost::aBasic(float* data,float l,float ds,float d){
     int mi=0;
     float mv=1.0/(2.0*theta)*ds*ds*(d-0)*(d-0) + data[0]*lambda; //Literal implementation of Eq.14, note the datastep^2 factor to scale correctly
@@ -481,9 +485,9 @@ void Cost::optimizeA(){
 
     
     // a update
-    for(st point=0;point<w*h;point++){
+    for(st point = 0; point < w*h; point++){
         float blank;
-        a[point]=aBasic(data+point*l,l,ds,d[point],blank);
+        a[point] = aBasic(data+point*l,l,ds,d[point],blank);
     }
     pfShow("d",_d,0,Vec2d(0,layers));
     pfShow("a",_a,0,Vec2d(0,layers));

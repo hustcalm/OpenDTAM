@@ -22,32 +22,32 @@ void Optimizer::setDefaultParams(){
     lambda     =       .01;
 }
 
-static void memZero(GpuMat& in,Stream& cvStream){
-    cudaSafeCall(cudaMemsetAsync(in.data,0,in.rows*in.cols*sizeof(float),cv::gpu::StreamAccessor::getStream(cvStream)));
+static void memZero(GpuMat& in, Stream& cvStream){
+    cudaSafeCall(cudaMemsetAsync(in.data, 0, in.rows*in.cols*sizeof(float), cv::gpu::StreamAccessor::getStream(cvStream)));
 }
 
 Optimizer::Optimizer(CostVolume& cv)
 {
-    attach(cv);
-    initOptimization();
-    
+    attach(cv); // pointing to the cost volume on which will run the optimization
+    initOptimization(); // setting the initial theta
 }
+
 void Optimizer::attach(CostVolume& cv){
     //For performance reasons, OpenDTAM only supports multiple of 32 image sizes with cols >= 64
     CV_Assert(cv.rows % 32 == 0 && cv.cols % 32 == 0 && cv.cols >= 64);
     allocate();
     setDefaultParams();
-    stableDepthEnqueued=haveStableDepth=0;
-    this->cv=cv;
-    cvStream=cv.cvStream;
+    stableDepthEnqueued = haveStableDepth = 0;
+    this->cv = cv;
+    cvStream = cv.cvStream;
 }
-#define FLATALLOC( n) n.create(1,cv.rows*cv.cols, CV_32FC1); n=n.reshape(0,cv.rows);CV_Assert(n.isContinuous())
+#define FLATALLOC(n) n.create(1,cv.rows*cv.cols, CV_32FC1); n=n.reshape(0,cv.rows);CV_Assert(n.isContinuous())
 
 void Optimizer::allocate(){
 }
 
 void Optimizer::initOptimization(){
-    theta=thetaStart;
+    theta = thetaStart;
 }
 
 void Optimizer::initA() {
@@ -60,21 +60,23 @@ bool Optimizer::optimizeA(const cv::gpu::GpuMat _d,cv::gpu::GpuMat _a){
     this->_a=_a;
 
     Mat tmp(cv.rows,cv.cols,CV_32FC1);
-    bool doneOptimizing = theta <= thetaMin;
+    bool doneOptimizing = theta <= thetaMin; // Optimization until theta reaches a small enough thresholding
     int layerStep = cv.rows * cv.cols;
     float* d = (float*) _d.data;
     float* a = (float*) _a.data;
 
    loadConstants(cv.rows, cv.cols, cv.layers, layerStep, a, d, cv.data, (float*)cv.lo.data,
            (float*)cv.hi.data, (float*)cv.loInd.data);
-    minimizeACaller  ( cv.data, a, d, cv.layers, theta,lambda);
-    theta*=thetaStep;
+    minimizeACaller  ( cv.data, a, d, cv.layers, theta, lambda);
+
+    theta *= thetaStep; // update theta
+
     if (doneOptimizing){
-        stableDepthReady=Ptr<char>((char*)(new cudaEvent_t));
-        cudaEventCreate((cudaEvent_t*)(char*)stableDepthReady,cudaEventBlockingSync);
+        stableDepthReady = Ptr<char>((char*)(new cudaEvent_t));
+        cudaEventCreate((cudaEvent_t*)(char*)stableDepthReady, cudaEventBlockingSync);
 //         _a.convertTo(stableDepth,CV_32FC1,cv.depthStep,cv.far,cvStream);
-        cvStream.enqueueConvert(_a,stableDepth,CV_32FC1,cv.depthStep,cv.far);
-        cudaEventRecord(*(cudaEvent_t*)(char*)stableDepthReady,localStream);
+        cvStream.enqueueConvert(_a, stableDepth, CV_32FC1, cv.depthStep, cv.far);
+        cudaEventRecord(*(cudaEvent_t*)(char*)stableDepthReady, localStream);
         stableDepthEnqueued = 1;
     }
     return doneOptimizing;

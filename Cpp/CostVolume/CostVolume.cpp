@@ -15,28 +15,23 @@
 #include "graphics.hpp"
 #include <iostream>
 
-
 using namespace std;
 using namespace cv;
 using namespace cv::gpu;
-
-
-
-
 
 void CostVolume::solveProjection(const cv::Mat& R, const cv::Mat& T) {
     Mat P;
     RTToP(R, T, P);
     projection.create(4, 4, CV_64FC1);
-    projection=0.0;
-    projection(Range(0, 2), Range(0, 3)) += cameraMatrix.rowRange(0, 2);
+    projection = 0.0;
+    projection(Range(0, 2), Range(0, 3)) += cameraMatrix.rowRange(0, 2); // K
 
-    projection.at<double>(2,3)=1.0;
-    projection.at<double>(3,2)=1.0;
+    projection.at<double>(2,3) = 1.0;
+    projection.at<double>(3,2) = 1.0;
 //    {//debug
 //        cout<<"Augmented Camera Matrix:\n"<<projection<<endl;
 //    }
-    projection=projection*P;
+    projection = projection*P; // K*[R|t]
     
    // exit(0);
 }
@@ -69,25 +64,25 @@ CostVolume::CostVolume(Mat image, FrameID _fid, int _layers, float _near,
     near          = _near;
     far           = _far;
     depthStep     = (near - far) / (layers - 1);
-    cameraMatrix  = _cameraMatrix.clone();
-    solveProjection(R, T);
+    cameraMatrix  = _cameraMatrix.clone(); // deep copy
+    solveProjection(R, T); // image pixel to world of projection
     FLATALLOC(lo);
     FLATALLOC(hi);
     FLATALLOC(loInd);
-    dataContainer.create(layers, rows * cols, CV_32FC1);
+    dataContainer.create(layers, rows * cols, CV_32FC1); // M*N*S
     
     GpuMat tmp;
-    baseImage.upload(image.reshape(0,1));
-    cvtColor(baseImage,baseImageGray,CV_RGB2GRAY);
-    baseImage = baseImage.reshape(0,rows);
+    baseImage.upload(image.reshape(0,1)); // stacked rasterised
+    cvtColor(baseImage, baseImageGray, CV_RGB2GRAY);
+    baseImage = baseImage.reshape(0, rows); // restore to M*N
     baseImageGray = baseImageGray.reshape(0,rows);
-    cvStream.enqueueMemSet(loInd,0.0);
-    cvStream.enqueueMemSet(dataContainer,initialCost);
+    cvStream.enqueueMemSet(loInd, 0.0);
+    cvStream.enqueueMemSet(dataContainer, initialCost); // initial value to each voxel in Cost Volume
     data = (float*) dataContainer.data;
     //hitContainer.create(layers, rows * cols, CV_32FC1);
     //hitContainer = initialWeight;
     hits = (float*) hitContainer.data;
-    count = 0;
+    count = 0; // images stored in this CV
     
     //messy way to disguise cuda objects
     _cuArray = Ptr<char>((char*)(new cudaArray*));
@@ -145,6 +140,9 @@ void CostVolume::simpleTex(const Mat& image,Stream cvStream){
 }
 
 
+/*
+ * Update cost volume using the passing in image
+ */
 void CostVolume::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& T){
     using namespace cv::gpu::device::dtam_updateCost;
     localStream = cv::gpu::StreamAccessor::getStream(cvStream);
@@ -166,69 +164,74 @@ void CostVolume::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& 
     //
     Mat image;
     {
-    image=_image;//no copy
-        if(_image.type()!=CV_8UC4 || !_image.isContinuous()){
-            if(!_image.isContinuous()&&_image.type()==CV_8UC4){
-                cBuffer.create(_image.rows,_image.cols,CV_8UC4);
-                image=cBuffer;//.createMatHeader();
-                _image.copyTo(image);//copies data
+    image = _image; // no copy
+
+        // convert to CV_8UC4
+        if(_image.type() != CV_8UC4 || !_image.isContinuous()) {
+            if(!_image.isContinuous() && _image.type() == CV_8UC4){
+                cBuffer.create(_image.rows, _image.cols, CV_8UC4);
+                image = cBuffer; // .createMatHeader();
+                _image.copyTo(image); // copies data
                 
             }
-            if(_image.type()!=CV_8UC4){
-                cBuffer.create(_image.rows,_image.cols,CV_8UC4);
-                Mat cm=cBuffer;//.createMatHeader();
-                if(_image.type()==CV_8UC1||_image.type()==CV_8SC1){
-                    cvtColor(_image,cm,CV_GRAY2BGRA);
-                }else if(_image.type()==CV_8UC3||_image.type()==CV_8SC3){
-                    cvtColor(_image,cm,CV_BGR2BGRA);
+            if(_image.type() != CV_8UC4){
+                cBuffer.create(_image.rows, _image.cols, CV_8UC4);
+                Mat cm = cBuffer; //.createMatHeader();
+                if(_image.type() == CV_8UC1 || _image.type() == CV_8SC1){
+                    cvtColor(_image, cm, CV_GRAY2BGRA);
+                }else if(_image.type() == CV_8UC3 || _image.type() == CV_8SC3){
+                    cvtColor(_image,cm, CV_BGR2BGRA);
                 }else{
-                    image=_image;
-                    if(_image.channels()==1){
-                        cvtColor(image,image,CV_GRAY2BGRA);
+                    image = _image;
+                    if(_image.channels() == 1){
+                        cvtColor(image, image, CV_GRAY2BGRA);
                     }
-                    if(_image.channels()==3){
-                        cvtColor(image,image,CV_BGR2BGRA);
+                    if(_image.channels() == 3){
+                        cvtColor(image, image, CV_BGR2BGRA);
                     }
+
                     //image is now 4 channel, unknown depth but not 8 bit
-                    if(_image.depth()>=5){//float
-                        image.convertTo(cm,CV_8UC4,255.0);
-                    }else if(image.depth()>=2){//0-65535
-                        image.convertTo(cm,CV_8UC4,1/256.0);
+                    if(_image.depth() >= 5){ //float
+                        image.convertTo(cm, CV_8UC4, 255.0);
+                    }else if(image.depth() >= 2){ //0-65535
+                        image.convertTo(cm, CV_8UC4, 1/256.0);
                     }
                 }
                 image=cm;
             }
         }
+
         CV_Assert(image.type()==CV_8UC4);
     }
-    //change input image to a texture
-    //ArrayTexture tex(image, cvStream);
-    simpleTex(image,cvStream);
-    cudaTextureObject_t& texObj=*((cudaTextureObject_t*)(char*)_texObj);
+
+    // change input image to a texture
+    // ArrayTexture tex(image, cvStream);
+    simpleTex(image, cvStream);
+    cudaTextureObject_t& texObj = *((cudaTextureObject_t*)(char*)_texObj);
 //     cudaTextureObject_t texObj=simpleTex(image,cvStream);
 //     cudaSafeCall( cudaDeviceSynchronize() );
 
     //find projection matrix from cost volume to image (3x4)
     Mat viewMatrixImage;
-    RTToP(R,T,viewMatrixImage);
-    Mat cameraMatrixTex(3,4,CV_64FC1);
-    cameraMatrixTex=0.0;
+    RTToP(R, T, viewMatrixImage);
+    Mat cameraMatrixTex(3, 4, CV_64FC1);
+    cameraMatrixTex = 0.0;
     cameraMatrix.copyTo(cameraMatrixTex(Range(0,3),Range(0,3)));
     cameraMatrixTex(Range(0,2), Range(2,3)) += 0.5;//add 0.5 to x,y out //removing causes crash
 
-    Mat imFromWorld=cameraMatrixTex*viewMatrixImage;//3x4
-    Mat imFromCV=imFromWorld*projection.inv();
-    imFromCV.colRange(2,3)*=depthStep;
+    Mat imFromWorld = cameraMatrixTex*viewMatrixImage; //3x4
+    Mat imFromCV = imFromWorld*projection.inv();
+    imFromCV.colRange(2,3) *= depthStep;
     assert(baseImage.isContinuous());
     assert(lo.isContinuous());
     assert(hi.isContinuous());
     assert(loInd.isContinuous());
     
     //for each slice
-    for(int y=0; y<rows; y++){
+    for(int y = 0; y < rows; y++){
         //find projection from slice to image (3x3)
         double *p = (double*)imFromCV.data;
-        m33 sliceToIm={  p[0], p[2], p[3]+y*p[1],
+        m33 sliceToIm = {  p[0], p[2], p[3]+y*p[1],
                          p[4], p[6], p[7]+y*p[5],
                          p[8], p[10], p[11]+y*p[9]};
 
@@ -262,21 +265,20 @@ void CostVolume::updateCost(const Mat& _image, const cv::Mat& R, const cv::Mat& 
 //    volumeProjectCaller(persp,CONST_ARGS);
 //    simpleCostCaller(persp,CONST_ARGS);
 //    globalWeightedCostCaller(persp,.3,CONST_ARGS);
-    float w=count+++initialWeight;//fun parse
-    w/=(w+1); 
+    float w = count+++initialWeight; //fun parse
+    w /= (w+1); 
     assert(localStream);
-    globalWeightedBoundsCostCaller(persp,w,CONST_ARGS);
+    globalWeightedBoundsCostCaller(persp, w, CONST_ARGS);
 
 }
 
 CostVolume::~CostVolume(){
-    cudaArray*& cuArray=*((cudaArray**)(char*)_cuArray);
-    cudaTextureObject_t& texObj=*((cudaTextureObject_t*)(char*)_texObj);
+    cudaArray*& cuArray = *((cudaArray**)(char*)_cuArray);
+    cudaTextureObject_t& texObj = *((cudaTextureObject_t*)(char*)_texObj);
     if (cuArray){
         cudaFreeArray(cuArray);
     }
     if (texObj){
         cudaDestroyTextureObject(texObj);
     }
-    
 }
