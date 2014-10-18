@@ -8,11 +8,53 @@ cmake_policy(SET CMP0012 NEW)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb ")
 
 find_package( OpenCV 2.4 REQUIRED )
-find_package( Qt5Core REQUIRED)
+# find_package( Qt5Core REQUIRED)
 find_package(CUDA REQUIRED)
 find_package(Boost COMPONENTS system thread)
+
+find_package( OpenGL )
+
+#find_package( MKL REQUIRED)
+find_package(Qt5Widgets)
+find_package(Qt5Declarative)
+find_package(Qt5MultimediaWidgets)
+find_package(Qt5OpenGL)
+find_package(Qt5Core)
+find_package(Qt5Gui)
+find_package(Qt5Multimedia)
+find_package(Qt5Sql)
+find_package(Qt5WebKitWidgets)
 #add_definitions( -D__OPENCV_BUILD=1 )
 #message(STATUS ${OpenCV_CONSIDERED_CONFIGS})
+
+set( EIGEN_DIR "/usr/include/eigen3" ) 
+ 
+link_directories( /opt/intel/ipp/lib/intel64 /opt/intel/lib/intel64)
+#add_library(GraphicsLib SHARED graphics.cpp)#must be in own library so we can link against it.
+
+set( QT_INCLUDES 
+                 ${Qt5Widgets_INCLUDE_DIRS}
+                 ${Qt5Core_INCLUDE_DIRS} 
+				 ${Qt5MultimediaWidgets_INCLUDE_DIRS}
+				 ${Qt5OpenGL_INCLUDE_DIRS}
+				 ${Qt5Multimedia_INCLUDE_DIRS}
+				 ${Qt5Gui_INCLUDE_DIRS}
+				 ${Qt5Declarative_INCLUDE_DIRS}
+				 ${Qt5WebKitWidgets_INCLUDE_DIRS}
+ )
+ 
+ set ( QT_LIBRARIES ${Qt5Widgets_LIBRARIES} 
+                    ${Qt5Core_LIBRARIES}
+                    ${Qt5MultimediaWidgets_LIBRARIES}
+                    ${Qt5OpenGL_LIBRARIES}
+                    ${Qt5Multimedia_LIBRARIES}
+                    ${Qt5Gui_LIBRARIES}		
+                    ${Qt5Declarative_LIBRARIES}		
+                    ${Qt5Sql_LIBRARIES}
+                    ${Qt5WebKitWidgets_LIBRARIES}
+		)
+		
+set( GLFW3_LIBRARY "/usr/local/lib/libglfw.so" CACHE PATH "set glfw3 library" )		
 
 macro (add_sources)
     file (RELATIVE_PATH _relPath "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -43,13 +85,18 @@ add_subdirectory(Optimizer)
 add_subdirectory(DepthmapDenoiseWeightedHuber)
 add_subdirectory(utils)
 add_subdirectory(Scheduler)
+add_subdirectory( ptam )
+add_subdirectory( Visualization3D )
 
+include_directories( "${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${EIGEN_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} )
 
-include_directories("${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+qt5_add_resources(SHADERS_SRCS shaders.qrc )
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_30,code=sm_30; -gencode arch=compute_35,code=sm_35;--use_fast_math ;--restrict; -lineinfo; -O3)
 cuda_add_library(OpenDTAM SHARED ${DTAM_SOURCES} OpenDTAM.cpp)
 target_link_libraries(OpenDTAM opencv_cudaimgproc opencv_cudastereo)
-add_executable (a.out testprog.cpp convertAhandaPovRayToStandard.cpp graphics.cpp)
+add_executable( a.out testprog.cpp convertAhandaPovRayToStandard.cpp graphics.cpp)
+add_executable( opendtamdemo opendtamdemo.cpp projectdata.cpp densedata.cpp drawimage.cpp graphics.cpp depthmapstereo.cpp ${SHADERS_SRCS})
 target_link_libraries( a.out  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES})
+target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} utility-3d ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
 
