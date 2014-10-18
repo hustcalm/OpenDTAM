@@ -53,7 +53,7 @@ class MapViewer;
 #include <cvd/byte.h>
 // #endif
 
-#include "external_includes/vtkincludes.h"
+// #include "external_includes/vtkincludes.h"
 #include "external_includes/opencvincludes.h"
 
 //#endif
@@ -101,7 +101,7 @@ class ProjectData
   } mPtamData;
   
   
-  vtkSmartPointer< vtkPolyData > mSparsePoints , mSparsePointsNormals;
+//   vtkSmartPointer< vtkPolyData > mSparsePoints , mSparsePointsNormals;
   
 
 

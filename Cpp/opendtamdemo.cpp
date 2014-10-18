@@ -26,7 +26,6 @@
 
 //debug
 #include "tictoc.h"
-#include "IO/posereader.h"
 
 
 
@@ -42,8 +41,13 @@
 #include "ptam/CalibImage.h"
 #include "ptam/CalibCornerPatch.h"
 
-#include "helper.h"
-
+#include "Visualization3D/openglhelper.h"
+#include <GLFW/glfw3.h>
+#include "Visualization3D/trackballcamera.h"
+#include "depthmapstereo.h"
+#include "projectdata.h"
+#include "densedata.h"
+#include "drawimage.h"
 
 
 
@@ -175,7 +179,6 @@ void grabFrame( cv::Mat& image , CVD::Image<CVD::Rgb<CVD::byte> > &coloredImage 
 void ptam( Mat& frame );
 void undistortImageBarrel( cv::Mat &image , cv::Mat &udImage , double dw , double dwInv , 
 		            double d2Tan , double fx , double fy , double cx , double cy );
-void display3DPoints( vector< Eigen::Vector3f >& objectPoints, vector< Eigen::Vector3f >& colors  );
 void displayImage( cv::Mat &image );
 
  void computeRays( int w , int h , const Eigen::Matrix3f  &rotation ,const  Eigen::Vector3f &translation , Eigen::Matrix3f &K , cv::Mat &rays   );
@@ -185,6 +188,7 @@ void displayImage( cv::Mat &image );
  void filterPoints( Eigen::Vector3f &cameraCenter , std::vector< Eigen::Vector3f > &points , std::vector< Eigen::Vector3f > &filteredPoints, float &minDistance , float &maxDistance );
  
  void computeStereoCorresp();
+ 
 const static bool valgrind=0;
 
 //A test program to make the mapper run
@@ -369,9 +373,7 @@ int App_main( int argc, char** argv )
     Mat ret;//a place to return downloaded images to
     
     cv::VideoCapture cap;
-    
-    vc::PoseReader reader;
-    
+
     cv::Mat intrinsics( 3 , 3 , CV_64FC1 ) , d( 4 , 1 , CV_64FC1 );
     
     cv::setIdentity( intrinsics );
@@ -413,10 +415,6 @@ int App_main( int argc, char** argv )
         return 0;
     }
     
-    std::string poseFilePath = "/media/avanindra/Data/projects/VIDEOCALIBRATION_APP_WINMAIN/KinectVideoPoseData2.vcdata";
-    
-    reader.open( poseFilePath );
-    
     double reconstructionScale=5/5.;
 
 //     for(int i=0;i<numImg;i++){
@@ -455,18 +453,7 @@ int App_main( int argc, char** argv )
     int layers=DTAM_LAYERS;
     int imagesPerCV=30;
     CostVolume cv;//(images[0],(FrameID)0,layers,100,0.5,R,T,cameraMatrix);;
-    
-//     std::cout<<cameraMatrix<<std::endl;
 
-//     //New Way (Needs work)
-//     OpenDTAM odm(cameraMatrix);
-//     odm.addFrameWithPose(images[0],Rs[0],Ts[0]);
-//     odm.addFrameWithPose(images[10],Rs[10],Ts[10]);
-//     for (int imageNum=2;imageNum<=numImg;imageNum++){
-//         odm.addFrame(images[imageNum]);
-//         usleep(100000);
-//     }
-    
     //Old Way
     int imageNum=0;
     
@@ -485,10 +472,8 @@ int App_main( int argc, char** argv )
         cap >> frame;
         if( frame.empty() ) 
             break;
-	
-// 	cv::flip( frame , frame , 0 );
-	
-	frame.copyTo( backupFrame );
+
+	 frame.copyTo( backupFrame );
 	
 	
 	
@@ -496,28 +481,13 @@ int App_main( int argc, char** argv )
 	 float dWinv = 1.0 / g_projectData->mBarrelDistortion;
 	 float d2Tan = 2.0 * tan( dW / 2.0 );
 	
-         
-	 
-	
-
-	 
-// 	 frame.convertTo( fImage , CV_32FC3);
-	 
-	 	 cv::Mat udImage;
-		 
-		 
-//          std::cout<<
+      
+	 cv::Mat udImage;
 	 
 	 undistortImageBarrel( frame , udImage , dW , dWinv , d2Tan , cameraMatrix.at< double >( 0 , 0 ) ,
 			       cameraMatrix.at< double >( 1 , 1 ) , cameraMatrix.at< double >( 0 ,2 ) , 
 			       cameraMatrix.at< double >( 1 , 2 ) );
-		 
-// 		 udImage = frame;
-	
-	
-// 	cv::flip( frame , frame , 1 );
-// 	cv::flip( frame , frame , 0 );
-// 	std::cout<<" frame : "<<imageNum<<" "<<imagesPerCV<<" "<<cv.count<<std::endl;
+
 	g_currentImage = udImage;
 	
 	ptam( backupFrame );
@@ -528,12 +498,7 @@ int App_main( int argc, char** argv )
 	 continue;
 
 	udImage.convertTo( image , CV_32FC3 ,1.0/65535.0);
-	Eigen::Matrix4f pose;
-      
-	reader.readNext( pose );
-	
-// 	g_currentPose = pose;
-	
+
 	Eigen::Matrix4f pose2 = g_currentPose;//pose.transpose() * initialPose;
 	
         T.at< double >( 0 , 0 ) = pose2( 0 , 3 );//=Ts[imageNum];
@@ -675,10 +640,6 @@ int App_main( int argc, char** argv )
 void computeRays( int w , int h , const Eigen::Matrix3f  &rotation , const Eigen::Vector3f &translation , Eigen::Matrix3f &K , cv::Mat &rays   )
 {
 	rays.create( h , w , CV_32FC3 );
-	
-	std::cout<< K << std::endl;
-	std::cout<<" rotation "<< rotation.transpose() << std::endl;
-	std::cout<<" w and h "<<w<<" "<<h<<std::endl;
 
 	Eigen::Matrix3f krInv = ( K * rotation ).inverse();
 
@@ -752,63 +713,9 @@ void computeAndDisplayPoints( Mat& rays, Mat& depths, cv::Mat &colorFrame , Eige
 
 // 		g_mesh->setData( objectPoints , colors );
 		
-		display3DPoints( objectPoints  , colors  );
+// 		display3DPoints( objectPoints  , colors  );
 		
 		
-}
-
-
-
-void display3DPoints( std::vector< Eigen::Vector3f > &objectPoints , std::vector< Eigen::Vector3f > &colors  )
-{
-	vtkSmartPointer< vtkPoints > points = vtkSmartPointer< vtkPoints >::New();
-
-	vtkSmartPointer< vtkPolyData > dataSet = vtkSmartPointer< vtkPolyData >::New();
-
-	int numObjectPoints = objectPoints.size();
-
-	points->Allocate( numObjectPoints );
-
-	dataSet->Allocate( numObjectPoints );
-
-	vtkSmartPointer< vtkIdList > vertex = vtkSmartPointer< vtkIdList >::New();
-	
-	vtkSmartPointer< vtkUnsignedCharArray > vertexColors = vtkSmartPointer< vtkUnsignedCharArray >::New();
-	
-	vertexColors->SetNumberOfComponents( 3 );
-	
-	vertexColors->SetName("Colors");
-
-	double pt[ 3 ];
-
-	for( int pp = 0; pp < numObjectPoints; pp++ )
-	{
-		vertex->Reset();
-
-		points->InsertNextPoint( objectPoints[ pp ]( 0 ) , objectPoints[ pp ]( 1 ) , objectPoints[ pp ]( 2 ) );
-
-		vertex->InsertNextId( pp );
-
-		dataSet->InsertNextCell( VTK_VERTEX , vertex );
-		
-		unsigned char color[] =  { colors[ pp ]( 0 ) * 255 , colors[ pp ]( 1 ) * 255 , colors[ pp ]( 2 ) * 255 };
-		
-		vertexColors->InsertNextTupleValue( color );
-	} 
-
-	dataSet->SetPoints( points );
-	
-	dataSet->GetPointData()->SetScalars( vertexColors );
-
-	tr::Display3DRoutines::displayPolyData( dataSet );
-	
-	vtkSmartPointer< vtkPLYWriter > writer =  vtkSmartPointer< vtkPLYWriter >::New();
-	
-	writer->SetInputData( dataSet );
-	
-	writer->SetFileName( ( QString::number( numObjectPoints ) + "densepoints.ply" ).toStdString().c_str() );
-	
-	writer->Update();
 }
 
 
@@ -924,8 +831,6 @@ mouse(int button, int state) {
 
     if ( button < 3 ) 
     {
-//       if( state == GLFW_PRESS )
-//       {
         g_mbutton[ button ] = (state == GLFW_PRESS);
 	
 	QPoint pos( g_prev_x , g_prev_y );
@@ -937,17 +842,15 @@ mouse(int button, int state) {
 	  
 	  if( button == 1 )
 	  {
-// 	    qDebug() << " right click " << endl;
-	    g_camera->registerMousePress( pos , Qt::RightButton );
+            g_camera->registerMousePress( pos , Qt::RightButton );
 	  }
 	  
 	}
 	else if( state == GLFW_RELEASE )
 	{
-// 	  if( button == 0 )
 	  g_camera->registerMouseRelease( pos );
 	}
-//       }
+	
     }
 }
 
@@ -1248,18 +1151,11 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
     std::cout<<" space bar pressed "<<std::endl;
   }
   
-  cv::imshow( "PtamImage" , image );
-  
-  int key = cv::waitKey( 2 );
+//   cv::imshow( "PtamImage" , image );
+//   
+//   int key = cv::waitKey( 2 );
   
 
-  
-//   if( key == ' ' )
-//   {
-//     projectData->mPtamData.mSpaceBarPressed;
-//     
-//     std::cout<<" space bar pressed "<<std::endl;
-//   }
 
 }
 
@@ -1458,7 +1354,7 @@ bool distanceSortPredicate( const std::pair< double , int > &obj1 , const std::p
 	 maxDistance = filterDistance;
 	 minDistance = distances[ 0 ].first ;//* 0.5;
 	 
-	 std::cout<<" min max distances : "<<minDistance<<" "<<maxDistance<<std::endl;
+// 	 std::cout<<" min max distances : "<<minDistance<<" "<<maxDistance<<std::endl; 
 	 
  }
 
@@ -1520,8 +1416,7 @@ void computeStereoCorresp()
   std::vector< Eigen::Vector3f > reconsPts , reconsColors;
   
   stereo.computeStereoCorrespondence( g_projectData->mPrevKeyImage , g_projectData->mCurrentKeyImage , reconstruction, color , R , T , K , D  , 0 ,reconsPts , reconsColors , -1  );
-  
-  
+
   g_OpenCVStereoDenseData->setData( reconsPts , reconsColors );
   
   g_OpenCVStereoDenseData->resetCamera();

@@ -62,8 +62,8 @@ ProjectData::ProjectData()
 	
 //ptam dataset
 //#ifdef VE_UNIX  
-  mSparsePoints = vtkSmartPointer< vtkPolyData >::New();
-  mSparsePointsNormals = vtkSmartPointer< vtkPolyData >::New();
+//   mSparsePoints = vtkSmartPointer< vtkPolyData >::New();
+//   mSparsePointsNormals = vtkSmartPointer< vtkPolyData >::New();
  
 
 // #ifndef VC_APPLE

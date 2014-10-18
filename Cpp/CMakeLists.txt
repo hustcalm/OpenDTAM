@@ -27,9 +27,21 @@ find_package(Qt5WebKitWidgets)
 #add_definitions( -D__OPENCV_BUILD=1 )
 #message(STATUS ${OpenCV_CONSIDERED_CONFIGS})
 
-set( EIGEN_DIR "/usr/include/eigen3" ) 
+set( EIGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/eigen3 CACHE PATH "set eigen dir" ) 
  
 link_directories( /opt/intel/ipp/lib/intel64 /opt/intel/lib/intel64)
+
+set( VC_OPENGL_CORE_PROFILE "GLEW" CACHE STRING "Select OpenGL Core Profile Provider")
+
+SET_PROPERTY( CACHE VC_OPENGL_CORE_PROFILE PROPERTY STRINGS "GLEW" "QOPENGL_FUNCTIONS" )
+
+if(  ${VC_OPENGL_CORE_PROFILE} STREQUAL "GLEW"  )
+
+add_definitions( -DVC_GLEW )
+
+else()
+ add_definitions( -DVC_QOPENGL_FUNCTIONS )
+endif() 
 #add_library(GraphicsLib SHARED graphics.cpp)#must be in own library so we can link against it.
 
 set( QT_INCLUDES 
@@ -75,7 +87,7 @@ endmacro(add_sources)
 
 set(BASEPATH "${CMAKE_SOURCE_DIR}")
  
-
+include_directories( "${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${EIGEN_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} )
 #add_library(GraphicsLib SHARED graphics.cpp)#must be in own library so we can link against it.
 
 
@@ -88,15 +100,15 @@ add_subdirectory(Scheduler)
 add_subdirectory( ptam )
 add_subdirectory( Visualization3D )
 
-include_directories( "${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${EIGEN_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} )
+
 
 qt5_add_resources(SHADERS_SRCS shaders.qrc )
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_30,code=sm_30; -gencode arch=compute_35,code=sm_35;--use_fast_math ;--restrict; -lineinfo; -O3)
 cuda_add_library(OpenDTAM SHARED ${DTAM_SOURCES} OpenDTAM.cpp)
-target_link_libraries(OpenDTAM opencv_cudaimgproc opencv_cudastereo)
+target_link_libraries(OpenDTAM ${OpenCV_LIBS})
 add_executable( a.out testprog.cpp convertAhandaPovRayToStandard.cpp graphics.cpp)
 add_executable( opendtamdemo opendtamdemo.cpp projectdata.cpp densedata.cpp drawimage.cpp graphics.cpp depthmapstereo.cpp ${SHADERS_SRCS})
 target_link_libraries( a.out  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES})
-target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} utility-3d ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
+target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
 
