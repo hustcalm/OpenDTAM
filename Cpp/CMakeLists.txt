@@ -5,7 +5,7 @@ cmake_policy(SET CMP0012 NEW)
 #set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 #set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "/local_store/Qt/5.3/gcc_64/lib/cmake")# "/local_store/opencv-2.4.9/debug/unix-install/")
 #message(STATUS ${CMAKE_MODULE_PATH})
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb ")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -g -ggdb -fpermissive")
 
 find_package( OpenCV 2.4 REQUIRED )
 # find_package( Qt5Core REQUIRED)
@@ -34,6 +34,9 @@ link_directories( /opt/intel/ipp/lib/intel64 /opt/intel/lib/intel64)
 set( VC_OPENGL_CORE_PROFILE "GLEW" CACHE STRING "Select OpenGL Core Profile Provider")
 
 SET_PROPERTY( CACHE VC_OPENGL_CORE_PROFILE PROPERTY STRINGS "GLEW" "QOPENGL_FUNCTIONS" )
+
+
+add_definitions( -DDATASET_PATH="${CMAKE_CURRENT_SOURCE_DIR}/dataset/DSCF0159.AVI" )
 
 if(  ${VC_OPENGL_CORE_PROFILE} STREQUAL "GLEW"  )
 

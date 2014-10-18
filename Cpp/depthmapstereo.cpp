@@ -57,6 +57,8 @@ DepthMapStereo::DepthMapStereo()
  sgbm.speckleRange = 32;
  sgbm.disp12MaxDiff = 0;
  sgbm.fullDP = false;
+ 
+ mDrawImage = 0;
 }
   
 
@@ -253,8 +255,13 @@ int DepthMapStereo::computeStereoCorrespondence(Mat& leftImage, Mat& rightImage,
   disp.convertTo( disp8, CV_8U, 255/(numberOfDisparities*16.));
 
   
-  cv::imshow( "disparity" , disp8 );
+//   cv::imshow( "disparity" , disp8 );
 //   cv::waitKey();
+  
+  if( mDrawImage )
+  {
+    mDrawImage->setImage( disp8 );
+  }
   
 
   int disparityScale = 16; 
@@ -580,6 +587,10 @@ int DepthMapStereo::computeStereoCorrespondence(Mat& leftImage, Mat& rightImage,
 }
  
  
+void DepthMapStereo::setDrawImage( vc::DrawImage* drawImage )
+{
+  mDrawImage = drawImage;
+}
 
  
  

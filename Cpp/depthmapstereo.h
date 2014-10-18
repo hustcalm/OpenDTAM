@@ -31,6 +31,7 @@
 
 #include "external_includes/opencvincludes.h"
 #include "external_includes/eigenincludes.h"
+#include "drawimage.h"
 
 
 namespace tr{
@@ -42,6 +43,8 @@ class DepthMapStereo
   
   cv::StereoSGBM sgbm;
   cv::StereoBM bm;
+  
+  vc::DrawImage *mDrawImage;
   
 public:
   
@@ -117,6 +120,8 @@ public:
  void computePose(int camId, int neighborId, cv::Mat& rotation, cv::Mat& translation);
  
  void computeDenseTrack();
+ 
+ void setDrawImage( vc::DrawImage *drawImage );
 };
 
 }
