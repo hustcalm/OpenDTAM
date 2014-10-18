@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/">
+      
+      <file>densevert.glsl</file>
+      <file>densepointcloudfrag.glsl</file> 
+      <file>ImageVert.glsl</file>
+      <file>ImageFrag.glsl</file>
+	  
+    </qresource>
+</RCC>
