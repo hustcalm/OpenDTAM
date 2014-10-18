@@ -245,9 +245,13 @@ void DrawImage::updateImage()
    {
      GL_CHECK( glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, mImageWidth , mImageHeight , 0, GL_BGRA, GL_UNSIGNED_BYTE , mCurrentImage.data ) );
    }
-   else
+   else if( mCurrentImage.channels() == 3  )
    {
      GL_CHECK( glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, mImageWidth , mImageHeight , 0, GL_BGR, GL_UNSIGNED_BYTE , mCurrentImage.data ) );
+   }
+   else if( mCurrentImage.channels() == 1 )
+   {
+      GL_CHECK( glTexImage2D( GL_TEXTURE_2D, 0, GL_RED, mImageWidth , mImageHeight , 0, GL_RED, GL_UNSIGNED_BYTE , mCurrentImage.data ) );  
    }
    
 

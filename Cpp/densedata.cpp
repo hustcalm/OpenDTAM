@@ -310,22 +310,10 @@ void DenseData::init()
     GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 3 ] ) );
     
 
-    int offset = 0;
 
-    GL_CHECK( glVertexAttribPointer( 0 , 3, GL_FLOAT, GL_FALSE, sizeof( VertexData )  , 0) );
-
-    offset += 3 * sizeof( GLfloat );
-
-    GL_CHECK( glVertexAttribPointer( 1 , 3 , GL_FLOAT, GL_FALSE, sizeof (  VertexData  ) , ( float * )offset ) );
-    
-    offset += 3 * sizeof( GLfloat );
-    
-    GL_CHECK( glVertexAttribPointer( 2 , 3 , GL_FLOAT, GL_FALSE, sizeof (  VertexData  ) , ( float * )offset ) );
     
         
-    GL_CHECK( glEnableVertexAttribArray(0) );
-    GL_CHECK( glEnableVertexAttribArray(1) );
-    GL_CHECK( glEnableVertexAttribArray(2) );
+
     
     
     GL_CHECK( glBindBuffer( GL_ARRAY_BUFFER , 0 ) );
@@ -340,7 +328,16 @@ void DenseData::init()
 
 void DenseData::render()
 {
+  
+    if( mVertexIndices.size() == 0 || mVertexData.size() == 0 )
+    {
+      
+      return;
+    }
+  
     GL_CHECK( glBindVertexArray(mVAO) );
+    
+    
   
   
     if( mHasNewData )
@@ -352,11 +349,27 @@ void DenseData::render()
       GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 1 ]) );
       GL_CHECK( glBufferData( GL_ELEMENT_ARRAY_BUFFER , mVertexIndices.size() * sizeof( GLuint ) , mVertexIndices.data() , GL_DYNAMIC_DRAW ) );
       //update faces 
-      GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 2 ]) );
-      GL_CHECK( glBufferData( GL_ELEMENT_ARRAY_BUFFER , mFaceIndices.size() * sizeof( GLuint ) , mFaceIndices.data() , GL_DYNAMIC_DRAW ) );
-      //update edges
-      GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 3 ]) );
-      GL_CHECK( glBufferData( GL_ELEMENT_ARRAY_BUFFER , mWireframeIndices.size() * sizeof( GLuint ) , mWireframeIndices.data() , GL_DYNAMIC_DRAW ) );
+//       GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 2 ]) );
+//       GL_CHECK( glBufferData( GL_ELEMENT_ARRAY_BUFFER , mFaceIndices.size() * sizeof( GLuint ) , mFaceIndices.data() , GL_DYNAMIC_DRAW ) );
+//       //update edges
+//       GL_CHECK( glBindBuffer( GL_ELEMENT_ARRAY_BUFFER , mVBO[ 3 ]) );
+//       GL_CHECK( glBufferData( GL_ELEMENT_ARRAY_BUFFER , mWireframeIndices.size() * sizeof( GLuint ) , mWireframeIndices.data() , GL_DYNAMIC_DRAW ) );
+      
+      GL_CHECK( glEnableVertexAttribArray(0) );
+      GL_CHECK( glEnableVertexAttribArray(1) );
+      GL_CHECK( glEnableVertexAttribArray(2) );
+      
+       int offset = 0;
+
+       GL_CHECK( glVertexAttribPointer( 0 , 3, GL_FLOAT, GL_FALSE, sizeof( VertexData )  , 0) );
+
+      offset += 3 * sizeof( GLfloat );
+
+      GL_CHECK( glVertexAttribPointer( 1 , 3 , GL_FLOAT, GL_FALSE, sizeof (  VertexData  ) , ( float * )offset ) );
+    
+      offset += 3 * sizeof( GLfloat );
+    
+      GL_CHECK( glVertexAttribPointer( 2 , 3 , GL_FLOAT, GL_FALSE, sizeof (  VertexData  ) , ( float * )offset ) );
       
       mHasNewData = false;
     }
@@ -368,6 +381,8 @@ void DenseData::render()
     
     if( mDisplayModes == POINT_CLOUD )
     {
+//         std::cout<<" render point cloud "<<std::endl;
+      
         GL_CHECK( glUseProgram( mPointCloudProgram ) );
       
         QMatrix4x4 mv = mCamera->getModelViewMatrix();
@@ -380,7 +395,7 @@ void DenseData::render()
 
         GL_CHECK( glUniformMatrix4fv( mvpMatrix , 1 , false , mat1.data() ) );
     
-        GL_CHECK( glDrawElements( GL_POINTS , mFaceIndices.size() , GL_UNSIGNED_INT , 0 ) );
+        GL_CHECK( glDrawElements( GL_POINTS , mVertexIndices.size() , GL_UNSIGNED_INT , 0 ) );
     }
     else if( mDisplayModes == SURFACE )
     {
@@ -462,6 +477,12 @@ void DenseData::resetCamera()
       mIsCameraInitialized = true;
   }
 }
+
+void DenseData::setCameraToInitialized()
+{
+  mIsCameraInitialized = true;
+}
+
 
 
   void DenseData::setData( std::vector< Eigen::Vector3f > &vertices , std::vector< Eigen::Vector3f > &colors  )

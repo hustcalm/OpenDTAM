@@ -67,6 +67,8 @@ struct VertexData
   
   void resetCamera();
   
+  void setCameraToInitialized();
+  
   void generateVertexArrays();
   
   void setVAO( const GLuint &vao );

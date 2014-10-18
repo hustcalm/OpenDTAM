@@ -49,6 +49,9 @@
 #include "densedata.h"
 #include "drawimage.h"
 
+#include "QThread"
+#include <pthread.h>
+
 
 
 #define DTAM_LAYERS 32
@@ -87,9 +90,9 @@ int g_spaceBarPressed = 0;
 TrackBallCamera *g_camera = 0 , *g_ptamCamera = 0 , *g_OpenCVStereoDenseCamera = 0; 
 
 vc::DenseData *g_mesh = 0 , *g_ptamSparseData = 0 , *g_DTAMDenseData = 0 , *g_OpenCVStereoDenseData = 0;
-vc::DrawImage *g_ptamDrawImage = 0;
+vc::DrawImage *g_ptamDrawImage = 0 , *g_disparityImage = 0;
 
-enum DisplayModes{ PTAM_IMAGE = 0 , PTAM_SPARSE , DTAM_DENSE , OPENCV_STEREO_DENSE } g_displayModes;
+enum DisplayModes{ PTAM_IMAGE = 0 , PTAM_SPARSE , DTAM_DENSE , OPENCV_STEREO_DENSE , STEREO_DISPARITY } g_displayModes;
 
 cv::Mat g_currentImage;
 
@@ -111,6 +114,35 @@ void display();
 void update();
 
 void init3dViewer();
+
+class ViewerThread : public QThread
+{
+  
+public:
+  
+  void run();
+  
+};
+
+class MainThread : public QThread
+{
+  
+  
+  
+  
+public:
+  
+  int argc;
+  char **argv;
+  
+  void run();
+  
+ 
+  
+};
+
+
+
 
 void  reshape(GLFWwindow *, int width, int height) 
 {
@@ -143,11 +175,11 @@ void scroll(GLFWwindow* window,double x,double y);
 // Idle is called between frames, here we advance the frame number and update
 // the procedural animation that is being applied to the mesh
 //
-void idle() 
-{
-    g_frame++;
-    update();
-}
+// void idle() 
+// {
+//     g_frame++;
+//     update();
+// }
 
 
 //------------------------------------------------------------------------------
@@ -191,20 +223,58 @@ void myExit(){
 
 int main( int argc, char** argv )
 {
-    
+    setIntrinsicsPTAMType( 1.04464 , 1.3932 , 0.496628 , 0.512184 , 0.675691 );
   
-    QtConcurrent::run( init3dViewer );
-
-    g_projectData = new ProjectData();
+    //QtConcurrent::run( init3dViewer );
     
-    cv::namedWindow( "disparity" );
+//     pthread_create()
+    
+//       pthread_t th1 , th2;
+//       pthread_create( &th1 , NULL,&init3dViewer, NULL );
+//       pthread_setname_np(th1,"viewer");
+// //         if (affinity>0){
+//             cpu_set_t cpuset;
+//             CPU_ZERO(&cpuset);
+//             static int cores=cv::getNumberOfCPUs();
+//             CPU_SET( 8 , &cpuset);
+//             pthread_setaffinity_np(th1,8, &cpuset);
+//         }
+    
+//     std::cout<<" data set path : "<<" "<<DATASET_PATH<<std::endl; 
+
+    ViewerThread viewer;
+    
+    viewer.start();
+    
+    g_projectData = new ProjectData();
 
     initGui();
     
-    QFuture< int > ret = QtConcurrent::run( App_main , argc , argv );
+    MainThread mt;
     
-    ret.waitForFinished();
+    mt.argc = argc;
+    mt.argv = argv;
     
+    mt.start();
+
+    mt.wait();
+    viewer.wait();    
+//     QFuture< int > ret = QtConcurrent::run( App_main , argc , argv );
+    
+//     pthread_create( &th2 , NULL,&init3dViewer, NULL );
+//     pthread_setname_np(th2,"mainThread");
+// //         if (affinity>0){
+// //     cpu_set_t cpuset;
+//     CPU_ZERO(&cpuset);
+// //     cores=cv::getNumberOfCPUs();
+//     CPU_SET( 8 , &cpuset);
+//     pthread_setaffinity_np(th2,8, &cpuset);
+//     
+//     ret.waitForFinished();
+//     
+//     pthread_join( th1 , NULL );
+//     pthread_join( th2 , NULL );
+     
     myExit();
     
     return 0;
@@ -232,34 +302,15 @@ int App_main( int argc, char** argv )
     cv::setIdentity( intrinsics );
     cv::setIdentity( cameraMatrix );
     
-    g_intrinsics( 0 , 0 ) = 1.04464 * 640;
-    g_intrinsics( 1 , 1 ) = 1.3932 * 480;
-    g_intrinsics( 0 , 2 ) = 0.496628 * 640;
-    g_intrinsics( 1 , 2 ) = 0.512184 * 480;
-    
-//     g_intrinsics.setIdentity();
-
-//     g_intrinsics( 0 , 0 ) = 531.15f;    //1.04464 1.3932 0.496628 0.512184
-//     g_intrinsics( 1 , 1 ) = 531.15f;
-//     
-//     g_intrinsics( 0 , 2 ) = 320;
-//     g_intrinsics( 1 , 2 ) = 240;
-    
-//     std::cout<<g_intrinsics<<std::endl;
-    
     cameraMatrix.at< double >( 0 , 0 ) = g_intrinsics( 0 , 0 );
     cameraMatrix.at< double >( 1 , 1 ) = g_intrinsics( 1 , 1 );
     cameraMatrix.at< double >( 0 , 2 ) = g_intrinsics( 0 , 2 );
     cameraMatrix.at< double >( 1 , 2 ) = g_intrinsics( 1 , 2 );
     
-    Eigen::Matrix4f initialPose;
-    initialPose.setIdentity();
-
-    initialPose( 0 , 3 ) = -0.025;
     
     d.setTo( cv::Scalar( 0 ) );
      
-    cap.open("/home/avanindra/Videos/DSCF0159.AVI");//"/media/avanindra/Data/projects/VIDEOCALIBRATION_APP_WINMAIN/KinectVideoData2.avi");//
+    cap.open(DATASET_PATH);//"/media/avanindra/Data/projects/VIDEOCALIBRATION_APP_WINMAIN/KinectVideoData2.avi");//
 
     if( !cap.isOpened() )
     {
@@ -495,6 +546,7 @@ int App_main( int argc, char** argv )
 
 void init3dViewer()
 {
+  g_displayModes = PTAM_IMAGE;
   
   bool fullscreen = false;
   
@@ -586,6 +638,8 @@ void init3dViewer()
     
     g_ptamDrawImage = new vc::DrawImage();
     
+    g_disparityImage = new vc::DrawImage();
+    
     g_mesh->generateVertexArrays();
     
     g_mesh->init();
@@ -607,19 +661,21 @@ void init3dViewer()
     g_ptamDrawImage->generateVertexArray();
     g_ptamDrawImage->init();
     
+    g_disparityImage->generateVertexArray();
+    g_disparityImage->init();
         //
     // Start the main drawing loop
     //
     while (g_running) {
-        idle();
+//         idle();
         display();
         
-#if GLFW_VERSION_MAJOR>=3
+// #if GLFW_VERSION_MAJOR>=3
         glfwPollEvents();
         glfwSwapBuffers(g_window);
-#else
-        glfwSwapBuffers();
-#endif
+// #else
+//         glfwSwapBuffers();
+// #endif
         
         glFinish();
     }
@@ -634,6 +690,14 @@ void setIntrinsicsPTAMType( float fx , float fy , float cx , float cy , float ba
   g_ptamCamParams( 2 ) = cx ;
   g_ptamCamParams( 3 ) = cy ;
   g_ptamCamParams( 4 ) = barrelDist ;
+  
+  g_intrinsics.setIdentity();
+  
+  g_intrinsics( 0 , 0 ) = fx * 640;
+  g_intrinsics( 1 , 1 ) = fy * 480;
+  g_intrinsics( 0 , 2 ) = cx * 640;
+  g_intrinsics( 1 , 2 ) = cy * 480;
+  
 }
 
 void computeRays( int w , int h , const Eigen::Matrix3f  &rotation , const Eigen::Vector3f &translation , Eigen::Matrix3f &K , cv::Mat &rays   )
@@ -697,8 +761,10 @@ void computeAndDisplayPoints( Mat& rays, Mat& depths, cv::Mat &colorFrame , Eige
 			colorData += 3;
 
 		}
-				
 		
+		g_DTAMDenseData->setCameraToInitialized();
+				
+		g_DTAMDenseData->setData( objectPoints , colors );
 }
 
 
@@ -730,9 +796,9 @@ void display()
   {
     if( g_ptamSparseData )
     {
-      //     qDebug() << " rendering data "<<endl;
+//           qDebug() << " rendering sparse data "<<endl;
       GL_CHECK(  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) );
-      g_camera->setViewPortDimension( g_width , g_height );
+      g_ptamCamera->setViewPortDimension( g_width , g_height );
       g_ptamSparseData->render();
     }
     
@@ -743,7 +809,7 @@ void display()
     {
       //     qDebug() << " rendering data "<<endl;
       GL_CHECK(  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) );
-      g_camera->setViewPortDimension( g_width , g_height );
+      g_ptamCamera->setViewPortDimension( g_width , g_height );
       g_DTAMDenseData->render();
     }
   }
@@ -753,10 +819,21 @@ void display()
     {
       //     qDebug() << " rendering data "<<endl;
       GL_CHECK(  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) );
-      g_camera->setViewPortDimension( g_width , g_height );
+      g_OpenCVStereoDenseCamera->setViewPortDimension( g_width , g_height );
       g_OpenCVStereoDenseData->render();
     }
     
+    
+  }
+  else if( g_displayModes == STEREO_DISPARITY )
+  {
+    if( g_disparityImage )
+    {
+        GL_CHECK(  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT) );
+        g_disparityImage->setViewPort( g_width , g_height );
+        g_disparityImage->render();
+      
+    }
     
   }
   
@@ -770,6 +847,16 @@ void scroll(GLFWwindow* window,double x,double y){
   int zoom = y * 250;
   
   g_camera->registerMouseWheel( zoom );
+  
+  if( g_displayModes == PTAM_SPARSE )
+   g_ptamCamera->registerMouseWheel( zoom );
+  
+  if( g_displayModes == DTAM_DENSE )
+   g_ptamCamera->registerMouseWheel( zoom );
+  
+  if( g_displayModes == OPENCV_STEREO_DENSE )
+  g_OpenCVStereoDenseCamera->registerMouseWheel( zoom );
+  
 }
 
 
@@ -790,11 +877,23 @@ motion(int x, int y) {
     {
         // orbit
         g_camera->registerMouseMove( pos , Qt::LeftButton );
+	
+	if( g_displayModes == PTAM_SPARSE || g_displayModes == DTAM_DENSE )
+	  g_ptamCamera->registerMouseMove( pos , Qt::LeftButton );
+	
+	if( g_displayModes == OPENCV_STEREO_DENSE )
+        g_OpenCVStereoDenseCamera->registerMouseMove( pos , Qt::LeftButton );
+	
     } 
     else if ( !g_mbutton[0] && g_mbutton[1] && !g_mbutton[2]) 
     {
         g_camera->registerMouseMove( pos , Qt::RightButton );
 	
+	if( g_displayModes == PTAM_SPARSE || g_displayModes == DTAM_DENSE )
+	g_ptamCamera->registerMouseMove( pos , Qt::RightButton );
+	
+	if( g_displayModes == OPENCV_STEREO_DENSE )
+        g_OpenCVStereoDenseCamera->registerMouseMove( pos , Qt::RightButton );
 // 	qDebug() << " right move " << endl;
 	
     } 
@@ -819,15 +918,33 @@ static void mouse(GLFWwindow *, int button, int state, int mods)
 	  if( button == 0 )
 	   g_camera->registerMousePress( pos , Qt::LeftButton );
 	  
+	  if( g_displayModes == PTAM_SPARSE || g_displayModes == DTAM_DENSE )
+	   g_ptamCamera->registerMousePress( pos , Qt::LeftButton );
+	  
+	  if( g_displayModes == OPENCV_STEREO_DENSE )
+           g_OpenCVStereoDenseCamera->registerMousePress( pos , Qt::LeftButton );
+	  
 	  if( button == 1 )
 	  {
             g_camera->registerMousePress( pos , Qt::RightButton );
+	    
+	    if( g_displayModes == PTAM_SPARSE || g_displayModes == DTAM_DENSE )
+	    g_ptamCamera->registerMousePress( pos , Qt::RightButton );
+	    
+	    if( g_displayModes == OPENCV_STEREO_DENSE )
+            g_OpenCVStereoDenseCamera->registerMousePress( pos , Qt::RightButton );
 	  }
 	  
 	}
 	else if( state == GLFW_RELEASE )
 	{
 	  g_camera->registerMouseRelease( pos );
+	  
+	  if( g_displayModes == PTAM_SPARSE || g_displayModes == DTAM_DENSE )
+	  g_ptamCamera->registerMouseRelease( pos );
+	  
+	  if( g_displayModes == OPENCV_STEREO_DENSE )
+          g_OpenCVStereoDenseCamera->registerMouseRelease( pos );
 	}
 	
     }
@@ -847,7 +964,8 @@ keyboard(GLFWwindow *, int key, int /* scancode */, int event, int /* mods */) {
 	case 'S': g_displayModes=PTAM_SPARSE;std::cout<<" render sparse points "<<std::endl; break;
 	case 'I': g_displayModes=PTAM_IMAGE;std::cout<<" render Image "<<std::endl; break;
 	case 'P': g_displayModes=DTAM_DENSE;std::cout<<" render dtam dense points "<<std::endl; break;
-	case 'O': g_displayModes=DTAM_DENSE;std::cout<<" render opencv stereo dense points "<<std::endl; break;
+	case 'O': g_displayModes=OPENCV_STEREO_DENSE;std::cout<<" render opencv stereo dense points "<<std::endl; break;
+	case 'G': g_displayModes=STEREO_DISPARITY;std::cout<<" render opencv stereo dense points "<<std::endl; break;
 //         case 'F': fitFrame(); break;
 //         case GLFW_KEY_TAB: toggleFullScreen(); break;
 //         case '+':
@@ -943,18 +1061,10 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
     
     g_intrinsics( 0 , 0 ) = g_ptamCamParams( 0 ) * image.cols;
     g_intrinsics( 1 , 1 ) = g_ptamCamParams( 1 ) * image.rows;
-    g_intrinsics( 0 , 2 ) = g_ptamCamParams( 2 ) * image.cols;
-    g_intrinsics( 1 , 2 ) = g_ptamCamParams( 3 ) * image.rows;
+    g_intrinsics( 0 , 2 ) = g_ptamCamParams( 2 ) * image.cols - 0.5;
+    g_intrinsics( 1 , 2 ) = g_ptamCamParams( 3 ) * image.rows - 0.5;
     
-    g_projectData->mBarrelDistortion = 0.675691;
-
-//     projectData->mCameraMatrix.create( 3 , 3 , CV_64FC1 );
-//     cv::setIdentity( projectData->mCameraMatrix );
-// 
-//     projectData->mCameraMatrix.at< double >( 0 , 0 ) = w * camParams[ 0 ];
-//     projectData->mCameraMatrix.at< double >( 1 , 1 ) = h * camParams[ 1 ];
-//     projectData->mCameraMatrix.at< double >( 0 , 2 ) = w * camParams[ 2 ] - 0.5;
-//     projectData->mCameraMatrix.at< double >( 1 , 2 ) = h * camParams[ 3 ] - 0.5;
+    g_projectData->mBarrelDistortion = g_ptamCamParams( 4 );
     
     projectData->mpCamera = new ATANCamera( camParams , w , h );
     
@@ -1091,18 +1201,24 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 	  colors[ pp ]( 2 ) = 0;
 
       }
-      
+//       
     Eigen::Vector3f cameraCenter = -g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
       
     filterPoints( cameraCenter , points , filteredPoints , g_minDistance , g_maxDistance );
+    
+    g_ptamSparseData->setData( filteredPoints , colors );
       
     if( numPoints > 0 )
     {
       if( !g_ptamInitialized )
       {
-       g_ptamInitialized = true;
+        g_ptamInitialized = true;
+       
+        g_ptamSparseData->resetCamera();
       }
     }
+    
+    
  
   }
   
@@ -1372,6 +1488,8 @@ void computeStereoCorresp()
   
   tr::DepthMapStereo stereo;
   
+  stereo.setDrawImage( g_disparityImage );
+  
   std::vector< Eigen::Vector3f > reconsPts , reconsColors;
   
   stereo.computeStereoCorrespondence( g_projectData->mPrevKeyImage , g_projectData->mCurrentKeyImage , reconstruction, color , R , T , K , D  , 0 ,reconsPts , reconsColors , -1  );
@@ -1383,4 +1501,23 @@ void computeStereoCorresp()
   g_computeDepthMap = 0;
   
 }
+
+void ViewerThread::run()
+{
+//   CPU_ZERO(&cpuset);
+//   CPU_SET(cpuNumber, &cpuset);
+// 
+// 
+//   pthread_setaffinity((pthread_t) QThread::currentThreadId(), &cpuset);
+  
+  init3dViewer();
+}
+
+void MainThread::run()
+{
+//   QThread::run();
+  
+  App_main( argc , argv );
+}
+
 
