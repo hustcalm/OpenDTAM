@@ -29,6 +29,8 @@ public:
   
   void setVAO( GLuint vao );
   
+  void generateVertexArray();
+  
   void init();
   void render();
   void setViewPort( int w , int h );
@@ -42,6 +44,8 @@ public:
   
   
 protected:
+  
+  void readShaderFromFile( QString fileName , QString& shaderText );
   
   void updateImage();
 
@@ -60,7 +64,7 @@ protected:
   
   bool mIsImageChanged;
   
-  
+  ShaderSource mShaderSource ;
   
 };
 

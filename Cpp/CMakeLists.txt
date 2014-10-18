@@ -66,7 +66,9 @@ set( QT_INCLUDES
                     ${Qt5WebKitWidgets_LIBRARIES}
 		)
 		
-set( GLFW3_LIBRARY "/usr/local/lib/libglfw.so" CACHE PATH "set glfw3 library" )		
+set( GLFW3_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/link_libraries/glfw.so CACHE PATH "set glfw3 library" )	
+
+set( PTAM_LIBRARIES cvd GVars3 )
 
 macro (add_sources)
     file (RELATIVE_PATH _relPath "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -87,7 +89,7 @@ endmacro(add_sources)
 
 set(BASEPATH "${CMAKE_SOURCE_DIR}")
  
-include_directories( "${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${EIGEN_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} )
+include_directories( "${BASEPATH}" ${CUDA_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${EIGEN_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty_includes )
 #add_library(GraphicsLib SHARED graphics.cpp)#must be in own library so we can link against it.
 
 
@@ -99,8 +101,8 @@ add_subdirectory(utils)
 add_subdirectory(Scheduler)
 add_subdirectory( ptam )
 add_subdirectory( Visualization3D )
-
-
+add_subdirectory(link_libraries)
+add_subdirectory(thirdparty_includes)
 
 qt5_add_resources(SHADERS_SRCS shaders.qrc )
 
@@ -111,4 +113,6 @@ add_executable( a.out testprog.cpp convertAhandaPovRayToStandard.cpp graphics.cp
 add_executable( opendtamdemo opendtamdemo.cpp projectdata.cpp densedata.cpp drawimage.cpp graphics.cpp depthmapstereo.cpp ${SHADERS_SRCS})
 target_link_libraries( a.out  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES})
 target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
+
+
 

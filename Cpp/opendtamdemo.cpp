@@ -53,6 +53,10 @@
 
 #define DTAM_LAYERS 32
 
+//A test program to make the mapper run
+using namespace cv;
+using namespace cv::gpu;
+using namespace std;
 
 
 //debug
@@ -64,6 +68,7 @@ ProjectData *g_projectData;
 
 Eigen::Matrix4f g_currentPose;
 Eigen::Matrix3f g_intrinsics;
+Eigen::Matrix< float , 5 , 1  > g_ptamCamParams;
 
 bool g_runDTAM = false , g_NewKeyFrame = false;
 
@@ -106,59 +111,39 @@ void display();
 void update();
 
 void init3dViewer();
-//
-// ### Misc. GLFW Callback Methods
 
-// Reshape is called when the window is resized, here we need the width and 
-// height so that we can correctly adjust the aspect ratio of the projection
-// matrix.
-//
-void
-#if GLFW_VERSION_MAJOR>=3
-reshape(GLFWwindow *, int width, int height) {
-#else
-reshape(int width, int height) {
-#endif
+void  reshape(GLFWwindow *, int width, int height) 
+{
+
     g_width = width;
     g_height = height;
     
     GL_CHECK( glViewport( 0 , 0 , g_width , g_height ) );
     
     g_camera->setViewPortDimension( g_width , g_height );
+    g_ptamCamera->setViewPortDimension( g_width , g_height );
+    g_OpenCVStereoDenseCamera->setViewPortDimension( g_width , g_height );
+    
 }
 
-#if GLFW_VERSION_MAJOR>=3
-void windowClose(GLFWwindow*) {
+void windowClose(GLFWwindow*) 
+{
     g_running = false;
 }
-#else
-int windowClose() {
-    g_running = false;
-    return GL_TRUE;
-}
-#endif
 
-static void
-#if GLFW_VERSION_MAJOR>=3
-motion(GLFWwindow *, double dx, double dy);
-#else
-motion(int x, int y);
-#endif
 
-static void
-#if GLFW_VERSION_MAJOR>=3
-mouse(GLFWwindow *, int button, int state, int mods);
-#else
-mouse(int button, int state);
-#endif
+static void motion(GLFWwindow *, double dx, double dy);
+
+
+static void mouse(GLFWwindow *, int button, int state, int mods);
+
 
 void scroll(GLFWwindow* window,double x,double y);
 
 // Idle is called between frames, here we advance the frame number and update
 // the procedural animation that is being applied to the mesh
 //
-void
-idle() 
+void idle() 
 {
     g_frame++;
     update();
@@ -170,7 +155,7 @@ static void
 keyboard(GLFWwindow *, int key, int /* scancode */, int event, int /* mods */) ;
 
 
-
+void setIntrinsicsPTAMType( float fx , float fy , float cx , float cy , float barrelDist );
 void drawTrailPoints( std::vector< std::pair< QPoint , QPoint > > &points , cv::Mat &image );
 void rawFastCorners( std::vector< QPoint > &points , cv::Mat &image );
 void drawTrackedPoints( std::vector< QPoint > &trackedPoints , cv::Mat &image );
@@ -189,12 +174,11 @@ void displayImage( cv::Mat &image );
  
  void computeStereoCorresp();
  
+ void init3dViewer();
+ 
 const static bool valgrind=0;
 
-//A test program to make the mapper run
-using namespace cv;
-using namespace cv::gpu;
-using namespace std;
+
 
 void ptam( cv::Mat &frame , Eigen::Matrix4f &pose );
 
@@ -203,17 +187,19 @@ int App_main( int argc, char** argv );
 void myExit(){
     ImplThread::stopAllThreads();
 }
-int main( int argc, char** argv ){
-QtConcurrent::run( init3dViewer );
 
-// return 0;
+
+int main( int argc, char** argv )
+{
+    
+  
+    QtConcurrent::run( init3dViewer );
+
     g_projectData = new ProjectData();
     
     cv::namedWindow( "disparity" );
 
-//     initGui();
-
-//     int ret=App_main(argc, argv);
+    initGui();
     
     QFuture< int > ret = QtConcurrent::run( App_main , argc , argv );
     
@@ -223,6 +209,289 @@ QtConcurrent::run( init3dViewer );
     
     return 0;
 }
+
+
+int App_main( int argc, char** argv )
+{
+
+    int numImg=600;
+
+// #if !defined WIN32 && !defined _WIN32 && !defined WINCE && defined __linux__ && !defined ANDROID
+//     pthread_setname_np(pthread_self(),"App_main");
+// #endif
+
+    char filename[500];
+    Mat image, cameraMatrix( 3 , 3 , CV_64FC1 ), R( 3 , 3 , CV_64FC1 ), T( 3 , 1 , CV_64FC1 );
+    vector<Mat> images,Rs,Ts;
+    Mat ret;//a place to return downloaded images to
+    
+    cv::VideoCapture cap;
+
+    cv::Mat intrinsics( 3 , 3 , CV_64FC1 ) , d( 4 , 1 , CV_64FC1 );
+    
+    cv::setIdentity( intrinsics );
+    cv::setIdentity( cameraMatrix );
+    
+    g_intrinsics( 0 , 0 ) = 1.04464 * 640;
+    g_intrinsics( 1 , 1 ) = 1.3932 * 480;
+    g_intrinsics( 0 , 2 ) = 0.496628 * 640;
+    g_intrinsics( 1 , 2 ) = 0.512184 * 480;
+    
+//     g_intrinsics.setIdentity();
+
+//     g_intrinsics( 0 , 0 ) = 531.15f;    //1.04464 1.3932 0.496628 0.512184
+//     g_intrinsics( 1 , 1 ) = 531.15f;
+//     
+//     g_intrinsics( 0 , 2 ) = 320;
+//     g_intrinsics( 1 , 2 ) = 240;
+    
+//     std::cout<<g_intrinsics<<std::endl;
+    
+    cameraMatrix.at< double >( 0 , 0 ) = g_intrinsics( 0 , 0 );
+    cameraMatrix.at< double >( 1 , 1 ) = g_intrinsics( 1 , 1 );
+    cameraMatrix.at< double >( 0 , 2 ) = g_intrinsics( 0 , 2 );
+    cameraMatrix.at< double >( 1 , 2 ) = g_intrinsics( 1 , 2 );
+    
+    Eigen::Matrix4f initialPose;
+    initialPose.setIdentity();
+
+    initialPose( 0 , 3 ) = -0.025;
+    
+    d.setTo( cv::Scalar( 0 ) );
+     
+    cap.open("/home/avanindra/Videos/DSCF0159.AVI");//"/media/avanindra/Data/projects/VIDEOCALIBRATION_APP_WINMAIN/KinectVideoData2.avi");//
+
+    if( !cap.isOpened() )
+    {
+        std::cout << "Could not initialize capturing...\n";
+	
+        return 0;
+    }
+    
+    double reconstructionScale=5/5.;
+
+//     for(int i=0;i<numImg;i++){
+//         Mat tmp;
+//         sprintf(filename,"../../Trajectory_30_seconds/scene_%03d.png",i);
+//         convertAhandaPovRayToStandard("../../Trajectory_30_seconds",
+//                                       i,
+//                                       cameraMatrix,
+//                                       R,
+//                                       T);
+//         Mat image;
+//         cout<<"Opening: "<< filename << endl;
+//         
+//         imread(filename, -1).convertTo(image,CV_32FC3,1.0/65535.0);
+//         resize(image,image,Size(),reconstructionScale,reconstructionScale);
+//         
+//         images.push_back(image.clone());
+//         Rs.push_back(R.clone());
+//         Ts.push_back(T.clone());
+// 
+//     }
+    CudaMem cret(480,640,CV_32FC1);
+    ret=cret.createMatHeader();
+    //Setup camera matrix
+    double sx=reconstructionScale;
+    double sy=reconstructionScale;
+    cameraMatrix+=(Mat)(Mat_<double>(3,3) <<    0.0,0.0,0.5,
+                                                0.0,0.0,0.5,
+                                                0.0,0.0,0.0);
+    cameraMatrix=cameraMatrix.mul((Mat)(Mat_<double>(3,3) <<    sx,0.0,sx,
+                                                                0.0,sy ,sy,
+                                                                0.0,0.0,1.0));
+    cameraMatrix-=(Mat)(Mat_<double>(3,3) <<    0.0,0.0,0.5,
+                                                0.0,0.0,0.5,
+                                                0.0,0.0,0);
+    int layers=DTAM_LAYERS;
+    int imagesPerCV=30;
+    CostVolume cv;//(images[0],(FrameID)0,layers,100,0.5,R,T,cameraMatrix);;
+
+    //Old Way
+    int imageNum=0;
+    
+    cv::Mat rays( 480 , 640 , CV_32FC3  );
+   
+    Eigen::Vector3f cameraCenter;
+     
+    
+     cv::gpu::Stream s;
+     
+//      g_NewKeyFrame = true;
+     
+    for( ; ; ) //(int imageNum=1;imageNum<numImg;imageNum++)
+    {
+        cv::Mat frame , backupFrame , fImage;
+        cap >> frame;
+        if( frame.empty() ) 
+            break;
+
+	 frame.copyTo( backupFrame );
+	
+	
+	
+	 float dW = g_projectData->mBarrelDistortion;
+	 float dWinv = 1.0 / g_projectData->mBarrelDistortion;
+	 float d2Tan = 2.0 * tan( dW / 2.0 );
+	
+      
+	 cv::Mat udImage;
+	 
+	 undistortImageBarrel( frame , udImage , dW , dWinv , d2Tan , cameraMatrix.at< double >( 0 , 0 ) ,
+			       cameraMatrix.at< double >( 1 , 1 ) , cameraMatrix.at< double >( 0 ,2 ) , 
+			       cameraMatrix.at< double >( 1 , 2 ) );
+
+	g_currentImage = udImage;
+	
+	ptam( backupFrame );
+	
+	g_ptamDrawImage->setImage( backupFrame );
+	
+	computeStereoCorresp();
+	
+	if( !g_runDTAM )
+	 continue;
+
+	udImage.convertTo( image , CV_32FC3 ,1.0/65535.0);
+
+	Eigen::Matrix4f pose2 = g_currentPose;//pose.transpose() * initialPose;
+	
+        T.at< double >( 0 , 0 ) = pose2( 0 , 3 );//=Ts[imageNum];
+        T.at< double >( 1 , 0 ) = pose2( 1 , 3 );
+	T.at< double >( 2 , 0 ) = pose2( 2 , 3 );
+	
+	for( int rr = 0; rr < 3; rr++ )
+	  for( int cc = 0; cc < 3 ; cc++ )
+	  {
+	    R.at< double >( rr , cc ) = pose2( rr , cc );
+	  }
+	  
+// 	  std::cout<<pose2<<std::endl;
+	  
+	if( g_NewKeyFrame )
+	{
+	  
+// 	  imageNum = 0;
+	  
+	  std::cout<<" init cost volume "<<cameraMatrix<<std::endl;
+	  
+	  float near = 1.0 / g_minDistance ;
+	  float far = 1.0 / g_maxDistance ;
+	  
+	  cv = CostVolume( image,(FrameID)0,layers, near , far ,R,T,cameraMatrix);
+	  
+	  computeRays( udImage.cols , udImage.rows , g_currentPose.block( 0 , 0 , 3 , 3 ) , g_currentPose.block( 0 , 3 , 3 , 1 ) , g_intrinsics , rays );
+	  
+	  cameraCenter = - g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
+	 
+	  imageNum++;
+	  
+	  g_NewKeyFrame = false;
+	 
+	  continue;
+	}
+	
+	if( imageNum == 0 )
+	  continue;
+	
+	 imageNum++;
+	
+// 	R=Rs[imageNum];
+//         image=frame;//images[imageNum];
+
+        if(cv.count<imagesPerCV){
+            cv.updateCost(image, R, T);
+//             cudaDeviceSynchronize();
+//             for( int i=0;i<layers;i++){
+//                 pfShow("layer",cv.downloadOldStyle(i));
+//             }
+	    
+	   
+        }
+        else{
+//             cudaDeviceSynchronize();
+            //Attach optimizer
+            //Attach optimizer
+            Ptr<DepthmapDenoiseWeightedHuber> dp = createDepthmapDenoiseWeightedHuber(cv.baseImageGray,cv.cvStream);
+            DepthmapDenoiseWeightedHuber& denoiser=*dp;
+            Optimizer optimizer(cv);
+            optimizer.initOptimization();
+            GpuMat a(cv.loInd.size(),cv.loInd.type());
+//             cv.loInd.copyTo(a,cv.cvStream);
+            cv.cvStream.enqueueCopy(cv.loInd,a);
+            GpuMat d;
+            denoiser.cacheGValues();
+            ret=image*0;
+            pfShow("A function", ret, 0, cv::Vec2d(0, layers));
+            pfShow("D function", ret, 0, cv::Vec2d(0, layers));
+            pfShow("A function loose", ret, 0, cv::Vec2d(0, layers));
+            pfShow("Predicted Image",ret,0,Vec2d(0,1));
+            pfShow("Actual Image",udImage);
+//                pfShow("A", ret, 0, cv::Vec2d(0, layers));
+//                waitKey(0);
+//                gpause();
+            
+            std::cout<<" start optimization "<<std::endl;
+
+            bool doneOptimizing; int Acount=0; int QDcount=0;
+            do{
+//                 cout<<"Theta: "<< optimizer.getTheta()<<endl;
+//
+//                 if(Acount==0)
+//                     gpause();
+               a.download(ret);
+               pfShow("A function", ret, 0, cv::Vec2d(0, layers));
+                
+                
+
+                for (int i = 0; i < 10; i++) {
+                    d=denoiser(a,optimizer.epsilon,optimizer.getTheta());
+                    QDcount++;
+                    
+//                     denoiser._qx.download(ret);
+//                     pfShow("Q function:x direction", ret, 0, cv::Vec2d(-1, 1));
+//                     denoiser._qy.download(ret);
+//                     pfShow("Q function:y direction", ret, 0, cv::Vec2d(-1, 1));
+                   d.download(ret);
+                   pfShow("D function", ret, 0, cv::Vec2d(0, layers));
+                }
+                doneOptimizing=optimizer.optimizeA(d,a);
+                Acount++;
+            }while(!doneOptimizing);
+            optimizer.lambda=.01;
+            optimizer.optimizeA(d,a);
+            optimizer.cvStream.waitForCompletion();
+            a.download(ret);
+               pfShow("A function loose", ret, 0, cv::Vec2d(0, layers));
+//                gpause();
+//             cout<<"A iterations: "<< Acount<< "  QD iterations: "<<QDcount<<endl;
+//             pfShow("Depth Solution", optimizer.depthMap(), 0, cv::Vec2d(cv.far, cv.near));
+               imwrite("outz.png",ret);
+            imageNum=0;
+	    
+	    std::cout<<" done optimization "<<std::endl;
+	    
+// 	    g_NewKeyFrame = true;
+	    
+	    Mat out=optimizer.depthMap();
+//             cv=CostVolume( image , 0 , layers , 100 , 0.5 , R , T , cameraMatrix );//(images[imageNum],(FrameID)imageNum,layers,0.010,0.0,Rs[imageNum],Ts[imageNum],cameraMatrix);
+            computeAndDisplayPoints( rays , out , udImage , cameraCenter , cv );
+            
+//                         s=optimizer.cvStream;
+//             for (int imageNum=0;imageNum<numImg;imageNum=imageNum+1){
+//                 reprojectCloud(images[imageNum],images[0],optimizer.depthMap(),RTToP(Rs[0],Ts[0]),RTToP(Rs[imageNum],Ts[imageNum]),cameraMatrix);
+//             }
+            a.download(ret);
+            
+        }
+        s.waitForCompletion();// so we don't lock the whole system up forever
+    }
+    s.waitForCompletion();
+    Stream::Null().waitForCompletion();
+    return 0;
+}
+
+
 
 void init3dViewer()
 {
@@ -335,6 +604,9 @@ void init3dViewer()
     g_OpenCVStereoDenseData->init();
     g_OpenCVStereoDenseData->setCamera( g_OpenCVStereoDenseCamera );
     
+    g_ptamDrawImage->generateVertexArray();
+    g_ptamDrawImage->init();
+    
         //
     // Start the main drawing loop
     //
@@ -355,287 +627,14 @@ void init3dViewer()
 }
 
 
-int App_main( int argc, char** argv )
+void setIntrinsicsPTAMType( float fx , float fy , float cx , float cy , float barrelDist )
 {
-  
-    cv::namedWindow( "PtamImage" );
-    
-  
-    int numImg=600;
-
-// #if !defined WIN32 && !defined _WIN32 && !defined WINCE && defined __linux__ && !defined ANDROID
-//     pthread_setname_np(pthread_self(),"App_main");
-// #endif
-
-    char filename[500];
-    Mat image, cameraMatrix( 3 , 3 , CV_64FC1 ), R( 3 , 3 , CV_64FC1 ), T( 3 , 1 , CV_64FC1 );
-    vector<Mat> images,Rs,Ts;
-    Mat ret;//a place to return downloaded images to
-    
-    cv::VideoCapture cap;
-
-    cv::Mat intrinsics( 3 , 3 , CV_64FC1 ) , d( 4 , 1 , CV_64FC1 );
-    
-    cv::setIdentity( intrinsics );
-    cv::setIdentity( cameraMatrix );
-    
-    g_intrinsics( 0 , 0 ) = 1.04464 * 640;
-    g_intrinsics( 1 , 1 ) = 1.3932 * 480;
-    g_intrinsics( 0 , 2 ) = 0.496628 * 640;
-    g_intrinsics( 1 , 2 ) = 0.512184 * 480;
-    
-//     g_intrinsics.setIdentity();
-
-//     g_intrinsics( 0 , 0 ) = 531.15f;    //1.04464 1.3932 0.496628 0.512184
-//     g_intrinsics( 1 , 1 ) = 531.15f;
-//     
-//     g_intrinsics( 0 , 2 ) = 320;
-//     g_intrinsics( 1 , 2 ) = 240;
-    
-    std::cout<<g_intrinsics<<std::endl;
-    
-    cameraMatrix.at< double >( 0 , 0 ) = g_intrinsics( 0 , 0 );
-    cameraMatrix.at< double >( 1 , 1 ) = g_intrinsics( 1 , 1 );
-    cameraMatrix.at< double >( 0 , 2 ) = g_intrinsics( 0 , 2 );
-    cameraMatrix.at< double >( 1 , 2 ) = g_intrinsics( 1 , 2 );
-    
-    Eigen::Matrix4f initialPose;
-    initialPose.setIdentity();
-
-    initialPose( 0 , 3 ) = -0.025;
-    
-    d.setTo( cv::Scalar( 0 ) );
-     
-    cap.open("/home/avanindra/Videos/DSCF0159.AVI");//"/media/avanindra/Data/projects/VIDEOCALIBRATION_APP_WINMAIN/KinectVideoData2.avi");//
-
-    if( !cap.isOpened() )
-    {
-        std::cout << "Could not initialize capturing...\n";
-	
-        return 0;
-    }
-    
-    double reconstructionScale=5/5.;
-
-//     for(int i=0;i<numImg;i++){
-//         Mat tmp;
-//         sprintf(filename,"../../Trajectory_30_seconds/scene_%03d.png",i);
-//         convertAhandaPovRayToStandard("../../Trajectory_30_seconds",
-//                                       i,
-//                                       cameraMatrix,
-//                                       R,
-//                                       T);
-//         Mat image;
-//         cout<<"Opening: "<< filename << endl;
-//         
-//         imread(filename, -1).convertTo(image,CV_32FC3,1.0/65535.0);
-//         resize(image,image,Size(),reconstructionScale,reconstructionScale);
-//         
-//         images.push_back(image.clone());
-//         Rs.push_back(R.clone());
-//         Ts.push_back(T.clone());
-// 
-//     }
-    CudaMem cret(480,640,CV_32FC1);
-    ret=cret.createMatHeader();
-    //Setup camera matrix
-    double sx=reconstructionScale;
-    double sy=reconstructionScale;
-    cameraMatrix+=(Mat)(Mat_<double>(3,3) <<    0.0,0.0,0.5,
-                                                0.0,0.0,0.5,
-                                                0.0,0.0,0.0);
-    cameraMatrix=cameraMatrix.mul((Mat)(Mat_<double>(3,3) <<    sx,0.0,sx,
-                                                                0.0,sy ,sy,
-                                                                0.0,0.0,1.0));
-    cameraMatrix-=(Mat)(Mat_<double>(3,3) <<    0.0,0.0,0.5,
-                                                0.0,0.0,0.5,
-                                                0.0,0.0,0);
-    int layers=DTAM_LAYERS;
-    int imagesPerCV=30;
-    CostVolume cv;//(images[0],(FrameID)0,layers,100,0.5,R,T,cameraMatrix);;
-
-    //Old Way
-    int imageNum=0;
-    
-    cv::Mat rays( 480 , 640 , CV_32FC3  );
-   
-    Eigen::Vector3f cameraCenter;
-     
-    
-     cv::gpu::Stream s;
-     
-//      g_NewKeyFrame = true;
-     
-    for( ; ; ) //(int imageNum=1;imageNum<numImg;imageNum++)
-    {
-        cv::Mat frame , backupFrame , fImage;
-        cap >> frame;
-        if( frame.empty() ) 
-            break;
-
-	 frame.copyTo( backupFrame );
-	
-	
-	
-	 float dW = g_projectData->mBarrelDistortion;
-	 float dWinv = 1.0 / g_projectData->mBarrelDistortion;
-	 float d2Tan = 2.0 * tan( dW / 2.0 );
-	
-      
-	 cv::Mat udImage;
-	 
-	 undistortImageBarrel( frame , udImage , dW , dWinv , d2Tan , cameraMatrix.at< double >( 0 , 0 ) ,
-			       cameraMatrix.at< double >( 1 , 1 ) , cameraMatrix.at< double >( 0 ,2 ) , 
-			       cameraMatrix.at< double >( 1 , 2 ) );
-
-	g_currentImage = udImage;
-	
-	ptam( backupFrame );
-	
-	computeStereoCorresp();
-	
-	if( !g_runDTAM )
-	 continue;
-
-	udImage.convertTo( image , CV_32FC3 ,1.0/65535.0);
-
-	Eigen::Matrix4f pose2 = g_currentPose;//pose.transpose() * initialPose;
-	
-        T.at< double >( 0 , 0 ) = pose2( 0 , 3 );//=Ts[imageNum];
-        T.at< double >( 1 , 0 ) = pose2( 1 , 3 );
-	T.at< double >( 2 , 0 ) = pose2( 2 , 3 );
-	
-	for( int rr = 0; rr < 3; rr++ )
-	  for( int cc = 0; cc < 3 ; cc++ )
-	  {
-	    R.at< double >( rr , cc ) = pose2( rr , cc );
-	  }
-	  
-// 	  std::cout<<pose2<<std::endl;
-	  
-	if( g_NewKeyFrame )
-	{
-	  
-// 	  imageNum = 0;
-	  
-	  std::cout<<" init cost volume "<<cameraMatrix<<std::endl;
-	  
-	  float near = 1.0 / g_minDistance ;
-	  float far = 1.0 / g_maxDistance ;
-	  
-	  cv = CostVolume( image,(FrameID)0,layers, near , far ,R,T,cameraMatrix);
-	  
-	  computeRays( 640 , 480 , g_currentPose.block( 0 , 0 , 3 , 3 ) , g_currentPose.block( 0 , 3 , 3 , 1 ) , g_intrinsics , rays );
-	  
-	  cameraCenter = - g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
-	 
-	  imageNum++;
-	  
-	  g_NewKeyFrame = false;
-	 
-	  continue;
-	}
-	
-	if( imageNum == 0 )
-	  continue;
-	
-	 imageNum++;
-	
-// 	R=Rs[imageNum];
-//         image=frame;//images[imageNum];
-
-        if(cv.count<imagesPerCV){
-            cv.updateCost(image, R, T);
-//             cudaDeviceSynchronize();
-//             for( int i=0;i<layers;i++){
-//                 pfShow("layer",cv.downloadOldStyle(i));
-//             }
-	    
-	   
-        }
-        else{
-//             cudaDeviceSynchronize();
-            //Attach optimizer
-            //Attach optimizer
-            Ptr<DepthmapDenoiseWeightedHuber> dp = createDepthmapDenoiseWeightedHuber(cv.baseImageGray,cv.cvStream);
-            DepthmapDenoiseWeightedHuber& denoiser=*dp;
-            Optimizer optimizer(cv);
-            optimizer.initOptimization();
-            GpuMat a(cv.loInd.size(),cv.loInd.type());
-//             cv.loInd.copyTo(a,cv.cvStream);
-            cv.cvStream.enqueueCopy(cv.loInd,a);
-            GpuMat d;
-            denoiser.cacheGValues();
-            ret=image*0;
-            pfShow("A function", ret, 0, cv::Vec2d(0, layers));
-            pfShow("D function", ret, 0, cv::Vec2d(0, layers));
-            pfShow("A function loose", ret, 0, cv::Vec2d(0, layers));
-            pfShow("Predicted Image",ret,0,Vec2d(0,1));
-            pfShow("Actual Image",udImage);
-//                pfShow("A", ret, 0, cv::Vec2d(0, layers));
-//                waitKey(0);
-//                gpause();
-            
-            std::cout<<" start optimization "<<std::endl;
-
-            bool doneOptimizing; int Acount=0; int QDcount=0;
-            do{
-//                 cout<<"Theta: "<< optimizer.getTheta()<<endl;
-//
-//                 if(Acount==0)
-//                     gpause();
-               a.download(ret);
-               pfShow("A function", ret, 0, cv::Vec2d(0, layers));
-                
-                
-
-                for (int i = 0; i < 10; i++) {
-                    d=denoiser(a,optimizer.epsilon,optimizer.getTheta());
-                    QDcount++;
-                    
-//                     denoiser._qx.download(ret);
-//                     pfShow("Q function:x direction", ret, 0, cv::Vec2d(-1, 1));
-//                     denoiser._qy.download(ret);
-//                     pfShow("Q function:y direction", ret, 0, cv::Vec2d(-1, 1));
-                   d.download(ret);
-                   pfShow("D function", ret, 0, cv::Vec2d(0, layers));
-                }
-                doneOptimizing=optimizer.optimizeA(d,a);
-                Acount++;
-            }while(!doneOptimizing);
-            optimizer.lambda=.01;
-            optimizer.optimizeA(d,a);
-            optimizer.cvStream.waitForCompletion();
-            a.download(ret);
-               pfShow("A function loose", ret, 0, cv::Vec2d(0, layers));
-//                gpause();
-//             cout<<"A iterations: "<< Acount<< "  QD iterations: "<<QDcount<<endl;
-//             pfShow("Depth Solution", optimizer.depthMap(), 0, cv::Vec2d(cv.far, cv.near));
-               imwrite("outz.png",ret);
-            imageNum=0;
-	    
-	    std::cout<<" done optimization "<<std::endl;
-	    
-// 	    g_NewKeyFrame = true;
-	    
-	    Mat out=optimizer.depthMap();
-//             cv=CostVolume( image , 0 , layers , 100 , 0.5 , R , T , cameraMatrix );//(images[imageNum],(FrameID)imageNum,layers,0.010,0.0,Rs[imageNum],Ts[imageNum],cameraMatrix);
-            computeAndDisplayPoints( rays , out , udImage , cameraCenter , cv );
-            
-//                         s=optimizer.cvStream;
-//             for (int imageNum=0;imageNum<numImg;imageNum=imageNum+1){
-//                 reprojectCloud(images[imageNum],images[0],optimizer.depthMap(),RTToP(Rs[0],Ts[0]),RTToP(Rs[imageNum],Ts[imageNum]),cameraMatrix);
-//             }
-            a.download(ret);
-            
-        }
-        s.waitForCompletion();// so we don't lock the whole system up forever
-    }
-    s.waitForCompletion();
-    Stream::Null().waitForCompletion();
-    return 0;
+  g_ptamCamParams( 0 ) = fx ;
+  g_ptamCamParams( 1 ) = fy ;
+  g_ptamCamParams( 2 ) = cx ;
+  g_ptamCamParams( 3 ) = cy ;
+  g_ptamCamParams( 4 ) = barrelDist ;
 }
-
 
 void computeRays( int w , int h , const Eigen::Matrix3f  &rotation , const Eigen::Vector3f &translation , Eigen::Matrix3f &K , cv::Mat &rays   )
 {
@@ -672,14 +671,10 @@ void computeAndDisplayPoints( Mat& rays, Mat& depths, cv::Mat &colorFrame , Eige
 	
 	float step = ( maxDepth - minDepth ) / DTAM_LAYERS;
 	
-	minDepth = maxDepth - DTAM_LAYERS * step;
-	
-	std::cout<<"width and height : "<<( float )w<<" "<<( float )h<<std::endl;
-	
+	minDepth = maxDepth - ( DTAM_LAYERS - 1 ) * step;
+
 	uchar *colorData = colorFrame.data;
-	
-// 	cv::flip( depths , depths , 1 );
-	
+
 	int x , y;
 
 
@@ -690,31 +685,19 @@ void computeAndDisplayPoints( Mat& rays, Mat& depths, cv::Mat &colorFrame , Eige
 		  
 			if( depths.at< float >( yy , xx ) < minDepth || depths.at< float >( yy , xx ) > maxDepth )
 			{
-			  colorData += 3;
+			     colorData += 3;
 				continue;
 			}
-			Eigen::Vector3f vec = cameraCenter + ( 1.0 / depths.at< float >( yy , xx ) ) * rays.at< Eigen::Vector3f >( yy , xx );//( xx * 0.01 , yy * 0.01 , 1 );//
-
-// 			vec( 2 ) = 1.0 / depths.at< float >( yy , xx );
 			
-			objectPoints.push_back( vec );
+			
+			Eigen::Vector3f vec = cameraCenter + ( 1.0 / depths.at< float >( yy , xx ) ) * rays.at< Eigen::Vector3f >( yy , xx );//( xx * 0.01 , yy * 0.01 , 1 );//
+  	                objectPoints.push_back( vec );
 			
 			colors.push_back( Eigen::Vector3f( colorData[ 2 ] / 255.0 , colorData[ 1 ] / 255.0 , colorData[ 0 ] / 255.0 ) );
-			
-// 			x = xx;
-// 			y = yy;
-			
 			colorData += 3;
 
 		}
-		
-// 		std::cout<<" x and y "<<x<<" "<<y<<std::endl;
-
-
-// 		g_mesh->setData( objectPoints , colors );
-		
-// 		display3DPoints( objectPoints  , colors  );
-		
+				
 		
 }
 
@@ -822,12 +805,8 @@ motion(int x, int y) {
 }
 
 //------------------------------------------------------------------------------
-static void
-#if GLFW_VERSION_MAJOR>=3
-mouse(GLFWwindow *, int button, int state, int mods) {
-#else
-mouse(int button, int state) {
-#endif
+static void mouse(GLFWwindow *, int button, int state, int mods) 
+{
 
     if ( button < 3 ) 
     {
@@ -954,18 +933,18 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
 	//1.04464 1.3932 0.496628 0.512184 0.675691 fujifilm camera
     
-    camParams[ 0 ] = 1.04464;//1.11998;//1.07838;//
-    camParams[ 1 ] = 1.3932;//1.48422;//1.46835;//
-    camParams[ 2 ] = 0.496628;//0.508566;//0.456224;//
-    camParams[ 3 ] = 0.512184;//0.462427;//0.461248;//
-    camParams[ 4 ] = 0.675691;//-0.14197;//0.717887;//
+    camParams[ 0 ] = g_ptamCamParams( 0 );
+    camParams[ 1 ] = g_ptamCamParams( 1 );
+    camParams[ 2 ] = g_ptamCamParams( 2 );
+    camParams[ 3 ] = g_ptamCamParams( 3 );
+    camParams[ 4 ] = g_ptamCamParams( 4 );
     
     g_intrinsics.setIdentity();
     
-    g_intrinsics( 0 , 0 ) = 1.04464 * 640;
-    g_intrinsics( 1 , 1 ) = 1.3932 * 480;
-    g_intrinsics( 0 , 2 ) = 0.496628 * 640;
-    g_intrinsics( 1 , 2 ) = 0.512184 * 480;
+    g_intrinsics( 0 , 0 ) = g_ptamCamParams( 0 ) * image.cols;
+    g_intrinsics( 1 , 1 ) = g_ptamCamParams( 1 ) * image.rows;
+    g_intrinsics( 0 , 2 ) = g_ptamCamParams( 2 ) * image.cols;
+    g_intrinsics( 1 , 2 ) = g_ptamCamParams( 3 ) * image.rows;
     
     g_projectData->mBarrelDistortion = 0.675691;
 
@@ -1065,9 +1044,8 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
           
       projectData->mPtamData.mPrevNumCams = projectData->mpMap->vpKeyFrames.size();
 
-      std::cout<<" num points : "<< projectData->mpMap->vpPoints.size() <<" "<<projectData->mpMap->vpKeyFrames.size()<<std::endl;
-      std::cout<<" num frames : "<<projectData->mPtamData.mNumFrames<<std::endl;
-
+      std::cout<<" num points and frames : "<< projectData->mpMap->vpPoints.size() <<" "<<projectData->mpMap->vpKeyFrames.size()<<std::endl;
+     
       int numPoints = projectData->mpMap->vpPoints.size();
       
       std::vector< Eigen::Vector3f > points( numPoints ) , filteredPoints , colors( numPoints );
@@ -1077,14 +1055,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
         if( objectPoints.size() > 200 )
   {
 
-// 	K( 0 , 0 ) = projectData->mCameraMatrix.at< double >( 0 , 0 );
-//     K( 1 , 1 ) = projectData->mCameraMatrix.at< double >( 1 , 1 );
-//     K( 0 , 2 ) = projectData->mCameraMatrix.at< double >( 0 , 2 );
-//     K( 1 , 2 ) = projectData->mCameraMatrix.at< double >( 1 , 2 );
-
     Eigen::Matrix< float , 3 , 4 > projMat;
-
-    //pose = pose.inverted();
 
     for( int rr = 0; rr < 3; rr++ )
 	  for( int cc = 0; cc < 4 ; cc++ )
@@ -1105,7 +1076,6 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
     float xp = ( projHmg( 0 ) / projHmg( 2 ) );
     float yp = ( projHmg( 1 ) / projHmg( 2 ) );
 
-   // qDebug()<< trackedCorners[ 200 ].x() <<" "<<trackedCorners[ 200 ].y()<<" -- "<<xp<<" "<<yp<<endl;
   }
 
       for( int pp = 0; pp < numPoints; pp++ )
@@ -1122,20 +1092,14 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
       }
       
-      Eigen::Vector3f cameraCenter = -g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
+    Eigen::Vector3f cameraCenter = -g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
       
-      filterPoints( cameraCenter , points , filteredPoints , g_minDistance , g_maxDistance );
-      
-//       g_maxDistance = 0;
+    filterPoints( cameraCenter , points , filteredPoints , g_minDistance , g_maxDistance );
       
     if( numPoints > 0 )
     {
-//       g_mesh->setData( filteredPoints , colors );
-      
       if( !g_ptamInitialized )
       {
-//        g_mesh->resetCamera();
-       
        g_ptamInitialized = true;
       }
     }
@@ -1150,11 +1114,6 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
     
     std::cout<<" space bar pressed "<<std::endl;
   }
-  
-//   cv::imshow( "PtamImage" , image );
-//   
-//   int key = cv::waitKey( 2 );
-  
 
 
 }

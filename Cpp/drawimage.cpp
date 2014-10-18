@@ -1,7 +1,30 @@
 #include "drawimage.h"
 #include "Visualization3D/openglhelper.h"
+#include "QFile"
+#include "QFileInfo"
+#include "QDebug"
 
 namespace vc{
+  
+void DrawImage::readShaderFromFile( QString fileName , QString& shaderText )
+{
+	 QFile file( fileName );
+
+	 QFileInfo fileInfo( file );
+
+	 if (!file.open(QIODevice::ReadOnly))
+     {
+         qDebug() << "Cannot open file for reading: "
+                 << qPrintable(file.errorString()) << endl;
+         return;
+      }
+
+	QTextStream reader( &file );
+
+	shaderText = reader.readAll();
+}  
+    
+  
 
 DrawImage::DrawImage()
 {
@@ -9,11 +32,18 @@ DrawImage::DrawImage()
   mImageHeight = 480;
   
   mDrawImageProgram = -1;
+  
+   readShaderFromFile( ":/ImageVert.glsl" , mShaderSource.mVertexShaderSrc ); 
+ readShaderFromFile( ":/ImageFrag.glsl" , mShaderSource.mFragmentShaderSrc );
 }
 
 
 void DrawImage::init()
 {
+  
+    int shaderId =  addShaders( mShaderSource.mVertexShaderSrc , mShaderSource.mFragmentShaderSrc );
+    
+  
 #ifdef VC_QOPENGL_FUNCTIONS
 		initializeOpenGLFunctions();
 #endif
@@ -68,6 +98,14 @@ void DrawImage::init()
 
 void DrawImage::render()
 {
+    if( mIsImageChanged )
+    {
+      updateImage();
+      
+      mIsImageChanged = false;
+    }
+  
+  
     GL_CHECK( glUseProgram( mDrawImageProgram ) );
 
     GL_CHECK( glBindVertexArray( mVAO ) );
@@ -209,7 +247,7 @@ void DrawImage::updateImage()
    }
    else
    {
-     GL_CHECK( glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, mImageWidth , mImageHeight , 0, GL_RGB, GL_UNSIGNED_BYTE , mCurrentImage.data ) );
+     GL_CHECK( glTexImage2D( GL_TEXTURE_2D, 0, GL_RGB, mImageWidth , mImageHeight , 0, GL_BGR, GL_UNSIGNED_BYTE , mCurrentImage.data ) );
    }
    
 
@@ -227,6 +265,12 @@ void DrawImage::setVAO( GLuint vao )
 {
   mVAO = vao;
 }
+
+void DrawImage::generateVertexArray()
+{
+  GL_CHECK( glGenVertexArrays( 1 , &mVAO ) );
+}
+
 
 
 void DrawImage::setViewPort( int w, int h )
