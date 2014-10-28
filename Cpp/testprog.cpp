@@ -59,7 +59,7 @@ int App_main( int argc, char** argv )
     int imageNum=0;
     char filename[500];
     Mat cameraMatrix,R,T;
-    convertAhandaPovRayToStandard("/local_store/Dropbox/Research/DTAM GSoC/OpenDTAM/Trajectory_30_seconds",
+    convertAhandaPovRayToStandard("../../Trajectory_30_seconds",
                                   imageNum,
                                   cameraMatrix,
                                   R,
@@ -68,7 +68,7 @@ int App_main( int argc, char** argv )
 //     cout<<"cameraMatrix: "<<cameraMatrix<<"\n";
 //     cout<< "R : "<<R<<"\n";
 //     cout<< "T : "<<T<<"\n";
-    sprintf(filename,"/local_store/Dropbox/Research/DTAM GSoC/OpenDTAM/Trajectory_30_seconds/scene_%03d.png",imageNum);
+    sprintf(filename,"../../Trajectory_30_seconds/scene_%03d.png",imageNum);
     Mat image;
     
 
@@ -88,8 +88,8 @@ int App_main( int argc, char** argv )
 
     vector<Mat> images,Rs,Ts;
     for(int i=0;i<=50;i++){
-        sprintf(filename,"/local_store/Dropbox/Research/DTAM GSoC/OpenDTAM/Trajectory_30_seconds/scene_%03d.png",i);
-        convertAhandaPovRayToStandard("/local_store/Dropbox/Research/DTAM GSoC/OpenDTAM/Trajectory_30_seconds",
+        sprintf(filename,"../../Trajectory_30_seconds/scene_%03d.png",i);
+        convertAhandaPovRayToStandard("../../Trajectory_30_seconds",
                                       i,
                                       cameraMatrix,
                                       R,
@@ -135,10 +135,10 @@ int App_main( int argc, char** argv )
             Mat cameraAffinePoseAlternate,mask;
             hconcat(R,T,cameraAffinePoseAlternate);
 
-            if (cost.imageNum<3){
+            if (cost.imageNum<21){
                 cost.updateCostL1(image,R,T);
             }
-            if (cost.imageNum==2){ 
+            if (cost.imageNum==20){ 
                 cost.initOptimization();
                 cost.optimize();//Launches the optimizer threads
 //                 while(cost.running){usleep(1000);};
