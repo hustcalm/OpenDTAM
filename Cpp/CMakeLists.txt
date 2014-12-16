@@ -12,7 +12,8 @@ find_package( OpenCV 2.4 REQUIRED )
 find_package(CUDA REQUIRED)
 find_package(Boost COMPONENTS system thread)
 
-find_package( OpenGL )
+find_package( OpenGL REQUIRED)
+message(STATUS "OpenGL libs: ${OPENGL_LIBRARIES}")
 
 #find_package( MKL REQUIRED)
 find_package(Qt5Widgets)
@@ -69,7 +70,8 @@ set( QT_INCLUDES
                     ${Qt5WebKitWidgets_LIBRARIES}
 		)
 		
-set( GLFW3_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/link_libraries/glfw.so CACHE PATH "set glfw3 library" )	
+    #set( GLFW3_LIBRARY ${CMAKE_CURRENT_SOURCE_DIR}/link_libraries/glfw.so CACHE PATH "set glfw3 library" )	
+find_library(GLFW3_LIBRARY glfw)
 
 set( PTAM_LIBRARIES cvd GVars3 )
 
@@ -115,7 +117,15 @@ target_link_libraries(OpenDTAM ${OpenCV_LIBS})
 add_executable( a.out testprog.cpp convertAhandaPovRayToStandard.cpp graphics.cpp)
 add_executable( opendtamdemo opendtamdemo.cpp projectdata.cpp densedata.cpp drawimage.cpp graphics.cpp depthmapstereo.cpp ${SHADERS_SRCS})
 target_link_libraries( a.out  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES})
-target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
+message(STATUS "Libs:")
+message(STATUS "visuallizatioin3d Libs: ${visualization3d_LIBRARIES}")
+message(STATUS "ptam Libs: ${ptam}")
+message(STATUS "cvd Libs: ${cvd_LIBRARIES}")
+message(STATUS "GLEW Libs: ${GLEW_LIBRARIES}")
+message(STATUS "OpenCV Libs: ${OpenCV_LIBS}")
+message(STATUS "Boost Libs: ${Boost_LIBRARIES}")
+message(STATUS "Qt Libs: ${QT_LIBRARIES}")
 
-
+#target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} visualization3d GLEW cvd ptam ${GLFW3_LIBRARY} )
+target_link_libraries( opendtamdemo  OpenDTAM ${OpenCV_LIBS} ${Boost_LIBRARIES} ${QT_LIBRARIES} visualization3d GLEW cvd ptam /home/lihang/dev/OpenDTAM-PTAM-pose/Cpp/link_libraries/libglfw.so )
 

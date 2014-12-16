@@ -14,6 +14,6 @@ add_executable( ptam_main main.cc VideoSourceOpencv.cpp )
 add_executable( CameraCalibrator CameraCalibrator.cc VideoSourceOpencv.cpp )
 
 target_link_libraries( ptam ${PTAM_LIBRARIES}  lapack ${OpenCV_LIBS}  ${QT_LIBRARIES}  ${OPENGL_LIBRARIES})
-target_link_libraries( ptam_main ptam ${PTAM_LIBRARIES} GL)
+target_link_libraries( ptam_main ptam ${PTAM_LIBRARIES} ${OPENGL_LIBRARIES})
 
-target_link_libraries( CameraCalibrator ptam ${OpenCV_LIBS} GL)
+target_link_libraries( CameraCalibrator ptam ${OpenCV_LIBS} ${OPENGL_LIBRARIES})

@@ -242,19 +242,28 @@ int main( int argc, char** argv )
     
 //     std::cout<<" data set path : "<<" "<<DATASET_PATH<<std::endl; 
 
+    std::cout<<"New viewer thread..."<<std::endl;
     ViewerThread viewer;
     
+
+    std::cout<<"Starting viewer thread..."<<std::endl;
     viewer.start();
     
+
+    std::cout<<"New ProjectData..."<<std::endl;
     g_projectData = new ProjectData();
 
+    std::cout<<"Bringing the GUI up..."<<std::endl;
     initGui();
     
+
+    std::cout<<"Main thread..."<<std::endl;
     MainThread mt;
     
     mt.argc = argc;
     mt.argv = argv;
     
+    std::cout<<"Starting main thread..."<<std::endl;
     mt.start();
 
     mt.wait();
@@ -557,7 +566,7 @@ void init3dViewer()
         return;
     }
   
-  setGLCoreProfile();
+    setGLCoreProfile();
   
       if (fullscreen) {
 
@@ -603,8 +612,6 @@ void init3dViewer()
     // this is the only way to initialize glew correctly under core profile context.
     glewExperimental = true;
     
-
-
     if ( GLenum r = glewInit() != GLEW_OK) 
     {
         printf("Failed to initialize glew. Error = %s\n", glewGetErrorString(r));
