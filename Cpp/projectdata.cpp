@@ -32,9 +32,6 @@
 #include "QDir"
 #include "QDebug"
 
-
-// #ifndef VC_APPLE
-
 #include "ptam/ATANCamera.h"
 #include "ptam/MapMaker.h"
 #include "ptam/MapViewer.h"
@@ -42,16 +39,10 @@
 #include "ptam/Map.h"
 #include "ptam/MapPoint.h"
 #include "ptam/KeyFrame.h"
-
-// #ifdef VE_UNIX
- #include <ptam/Tracker.h>
-// #endif
-
-// #endif
+#include <ptam/Tracker.h>
 
 ProjectData::ProjectData()
 {
-
 	mComputeOpticalFlow = false;
 
 	mfeatureInitialized = false;
@@ -60,44 +51,16 @@ ProjectData::ProjectData()
 
 	mRunPTAM = false;
 	
-//ptam dataset
-//#ifdef VE_UNIX  
-//   mSparsePoints = vtkSmartPointer< vtkPolyData >::New();
-//   mSparsePointsNormals = vtkSmartPointer< vtkPolyData >::New();
- 
-
-// #ifndef VC_APPLE
-   mpTracker = 0;
-  mPtamData.mSpaceBarPressed = false;
-  mPtamData.mPrevNumCams = 0;
-  mPtamData.mNumFrames = 0;
-  
-#ifdef VC_UNIX
-  mPtamData.mBasePath = "/media/avanindra/Data/projects/project_data/dtam_dataset";
-  mPoseDataSetPath = "/media/avanindra/Data/projects/project_data/dtam_dataset/poses.vcpdset";
-#else
-  mPtamData.mBasePath = "D:\\projects\\project_data\\dtam_dataset";
-  mPoseDataSetPath = "D:\\projects\\project_data\\dtam_dataset\\poses.vcpdset";
-  mKeyFrameDataSetPath = "D:\\projects\\project_data\\dtam_dataset\\keyframe.vcpdset";
-#endif
-
-  mPtamData.mPtamInitialized = false;
-  mPtamData.mFrameLatency = 0; 
-  mPtamData.mNumFrameToSkip = 7;
-  mPtamData.mSkipFrame = true;
-
-// #endif
-
-  //mDtamTracker = new vc::DTAM();
-
-  //mDtamTracker->setProjectData( this );
-//#endif
-
+    mpTracker = 0;
+    mPtamData.mSpaceBarPressed = false;
+    mPtamData.mPrevNumCams = 0;
+    mPtamData.mNumFrames = 0;
+    
+    mPtamData.mPtamInitialized = false;
+    mPtamData.mFrameLatency = 0; 
+    mPtamData.mNumFrameToSkip = 7;
+    mPtamData.mSkipFrame = true;
 }
-
-
-
-
 
 ProjectData::~ProjectData()
 {

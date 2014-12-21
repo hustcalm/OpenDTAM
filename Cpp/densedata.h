@@ -29,14 +29,9 @@ class DenseData : public vc::BufferManager
 {
   
 public:
-  
-  
-
     
 struct VertexData
 {
-    
-    
     Eigen::Vector3f mVertex ;
     
     Eigen::Vector3f mColor;
@@ -134,7 +129,6 @@ protected:
   enum DisplayModes{ POINT_CLOUD = 0 , SURFACE , WIREFRAME , WIREFRAME_OVERLAY  } mDisplayModes;
   
   ShaderSource mPointCloudShaderSource , mSurfaceShaderSource , mWireframeShaderSource;
-  
   
 };
 

@@ -22,14 +22,12 @@ TrackBallCamera::TrackBallCamera()
 
 void TrackBallCamera::registerMouseMove ( const QPoint& pos, const Qt::MouseButtons& buttons  )
 {
-
 	if( mStartTrackBall && mCurrentKey == -1 )
 	{
 		track( pos , buttons ); 
 
 		mLastPoint = pos;
 	}
-
 }
 
 
