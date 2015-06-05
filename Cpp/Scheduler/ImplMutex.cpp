@@ -73,7 +73,7 @@
         int refcount;
     };
 */
-#else
+#else // Non-Win32, using pthread
 
     struct ImplMutex::Impl
     {
@@ -86,9 +86,6 @@
 
         pthread_mutex_t sl;
         int refcount;
-        
-        
-        
     };
 
 #endif
@@ -98,12 +95,14 @@ void ImplMutex::init()
     impl = new Impl;
     impl->init();
 }
+
 void ImplMutex::destroy()
 {
     impl->destroy();
     delete impl;
     impl = NULL;
 }
+
 void ImplMutex::lock() { impl->lock(); }
 void ImplMutex::unlock() { impl->unlock(); }
 bool ImplMutex::trylock() { return impl->trylock(); }
@@ -198,12 +197,14 @@ void ImplCondVar::init()
     impl = new Impl;
     impl->init();
 }
+
 void ImplCondVar::destroy()
 {
     impl->destroy();
     delete impl;
     impl = NULL;
 }
+
 void ImplCondVar::signal(){impl->signal();}
 void ImplCondVar::broadcast(){impl->broadcast();}
 void ImplCondVar::wait(ImplMutex& mutex){impl->wait(mutex);}

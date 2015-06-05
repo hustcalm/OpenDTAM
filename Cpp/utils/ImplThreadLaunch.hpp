@@ -6,13 +6,17 @@
 #  include <opencv2/core/core.hpp>
 #  include <map>
 #  include <iostream>
+
 #include <Scheduler/ImplMutex.hpp>
+
 namespace ImplThread{
-    extern std::map<const pthread_t,int* > mymap;
+    extern std::map<const pthread_t, int* > mymap;
     extern ImplMutex mutex;
     void stopAllThreads();
-    unsigned int startThread(void (*_func)(int*) , const std::string& _name="ODMThread",int affinity=-1);
+    unsigned int startThread(void (*_func)(int*), const std::string& _name="ODMThread", int affinity=-1);
 }
+
+// A template thread launcher implementation
 template <typename Object>
 class ImplThreadLauncher{
     
@@ -26,12 +30,15 @@ class ImplThreadLauncher{
     
     
     static void* launch (void* data){
-        Pass* pass=(Pass*)data;
-        pthread_setname_np(pthread_self(),pass->name.c_str());
-        if (pass->cpuid>0){
+        Pass* pass = (Pass*)data;
+        pthread_setname_np(pthread_self(), pass->name.c_str());
+
+        // Bind to the CPU?
+        if (pass->cpuid > 0){
             set_affinity(pass->cpuid);
         }
-        Object* object=(Object*)pass->instance;
+
+        Object* object = (Object*)pass->instance;
 
         (object->*(pass->func))(pass->stop);
         delete pass;
@@ -40,46 +47,43 @@ class ImplThreadLauncher{
     static void set_affinity(int cpuid){
         cpu_set_t cpuset;
         CPU_ZERO(&cpuset);
-        static int cores=cv::getNumberOfCPUs();
+        static int cores = cv::getNumberOfCPUs();
         CPU_SET(cpuid%cores, &cpuset);
-        pthread_setaffinity_np(pthread_self(),1, &cpuset);
+        pthread_setaffinity_np(pthread_self(), 1, &cpuset); // Should 1 be sizeof(cpu_set_t)
     }
     
-    
 public:
-    static unsigned int startThread(Object& object,void (Object::*_func)(int*), const std::string& _name="ODMThread",int affinity=-1){
+    static unsigned int startThread(Object& object, void (Object::*_func)(int*), const std::string& _name="ODMThread", int affinity=-1){
         ImplThread::mutex.lock();
         using namespace ImplThread;
-        Pass* pass=new Pass;
-        pass->name=_name;
-        pass->cpuid=affinity;
-        pass->func=_func;
-        pass->instance=&object;
-        pass->stop=new int(0);
-        int* stopp=pass->stop;
+        Pass* pass = new Pass;
+        pass->name = _name;
+        pass->cpuid = affinity;
+        pass->func = _func;
+        pass->instance = &object;
+        pass->stop = new int(0);
+        int* stopp = pass->stop;
         pthread_t thread;
         
-        pthread_create( &thread, NULL,launch, (void*) pass);
+        pthread_create(&thread, NULL, launch, (void*) pass);
         std::cout<<" Thread Requested: "<<_name<<" : "<<thread<<":"<< stopp<< std::endl;
-        mymap[thread]=stopp;
+        mymap[thread] = stopp;
         ImplThread::mutex.unlock();
         return thread;
     }
+
     static void stopThread(unsigned int thread_id){
         ImplThread::mutex.lock();
         using namespace ImplThread;
         if(mymap.count(thread_id)){
-            *mymap.at(thread_id)=1;
+            *mymap.at(thread_id) = 1;
             std::cout<<" Thread Stop: "<< thread_id<< std::endl;
-            pthread_join(thread_id,NULL);
+            pthread_join(thread_id, NULL);
             mymap.erase(thread_id);   
         }
         ImplThread::mutex.unlock();
     }
-    
 };
-
-
 
 #else
 #error OpenDTAM ImplThreadLauncher not implemented on this system

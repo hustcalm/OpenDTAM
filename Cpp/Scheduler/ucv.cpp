@@ -13,7 +13,7 @@ Tucv{
             }
         release(ucvq);
         if(!(myUcv=ucv(frame1,frame2))){
-            error! couldn't build a ucv! What? how can ucv fail!?
+            //error! couldn't build a ucv! What? how can ucv fail!?
         }
         lock(ucvd);
             ucvd.push(myUcv);
@@ -24,22 +24,22 @@ Tucv{
 cv::gpu::CudaMem imageContainer;
 
 Ptr<CostVolume> ucv(Frame& base,Frame& alt){
-    Mat cameraMatrix=this->cameraMatrix.clone();
+    Mat cameraMatrix = this->cameraMatrix.clone();
     gpuMat b,a;
     
-    Size2d s0=base.im.size();
-    resize(base.im,b,Size(),sc,sc);
-    resize(alt.im,a,Size(),sc,sc);
-    Size2d sn=b.size();
-    double sx=(sn.width/s0.width);
-    double sy=(sn.height/s0.height);
-    cameraMatrix+=(Mat)(Mat_<double>(3,3) << 0,0.0,0.5,
+    Size2d s0 = base.im.size();
+    resize(base.im, b, Size(), sc, sc);
+    resize(alt.im, a, Size(), sc, sc);
+    Size2d sn = b.size();
+    double sx = (sn.width/s0.width);
+    double sy = (sn.height/s0.height);
+    cameraMatrix += (Mat)(Mat_<double>(3,3) << 0,0.0,0.5,
                                         0.0,0.0,0.5,
                                         0.0,0.0,0);
-    cameraMatrix=cameraMatrix.mul((Mat)(Mat_<double>(3,3) <<    sx,0.0,sx,
+    cameraMatrix = cameraMatrix.mul((Mat)(Mat_<double>(3,3) <<    sx,0.0,sx,
                                             0.0,sy ,sy,
                                             0.0,0.0,1.0));
-    cameraMatrix-=(Mat)(Mat_<double>(3,3) << 0,0.0,0.5,
+    cameraMatrix -= (Mat)(Mat_<double>(3,3) << 0,0.0,0.5,
                                         0.0,0.0,0.5,
                                         0.0,0.0,0);
         
@@ -82,4 +82,4 @@ Ptr<CostVolume> ucv(Frame& base,Frame& alt){
     optimizer.cvStream.waitForCompletion();
     return cvp;
 }
-    
+

@@ -13,6 +13,7 @@ private:
     int _readStall;
     ImplCondVar cond;
     std::deque<T> q;
+
 public:
     void push(T& in){
         mutex.lock();
@@ -24,24 +25,29 @@ public:
     T pop(){// a real pop that takes the element off the end
         T out;
         mutex.lock();
-        while(q.size()==0||_readStall){
+
+        while(q.size() == 0 || _readStall){
             cond.wait(mutex);
         }
-        out=q.front();
+
+        out = q.front();
         q.pop_front();
-        if (q.size()>0){
+
+        if (q.size() > 0){
             cond.signal();
         }
         mutex.unlock();
         return out;
     }
+
     void readStall(){
-        _readStall=1;
+        _readStall = 1;
     }
+
     void readUnstall(){
-        _readStall=0;
+        _readStall = 0;
         mutex.lock();
-        cond.broadcast();//will this really work?
+        cond.broadcast(); //will this really work?
         mutex.unlock();
     }
 };
@@ -69,51 +75,62 @@ public:
         mutex.unlock();
     }
     
-    T pop(){// a real pop that takes the element off the end
+    T pop(){ // a real pop that takes the element off the end
         T out;
         mutex.lock();
-        while(q.size()==0||_readStall){
+
+        while(q.size() == 0 || _readStall){
             cond.wait(mutex);
         }
-        out=q.back();
-        q.pop_back();
-        if (q.size()>0){
-            cond.signal();
-        }
-        mutex.unlock();
-        return out;
-    }
-    T peek(){
-        mutex.lock();
-        while(q.size()<1||_readStall){
-            cond.wait(mutex);
-        }
-        T out = q.back();
-        mutex.unlock();
-        return out;
-    }
-    std::vector<T> peekn(int n=1){
-        std::vector<T> out;
-        mutex.lock();
         
-        while(q.size()<n||_readStall){
-            cond.wait(mutex);
-        }
-        std::reverse_iterator<typename std::deque<T>::iterator> it=q.rbegin();
-        for(int i=0;i<n;i++){
-            out.push_back(q[q.size()-n+i]);
+        out = q.back();
+        q.pop_back();
+        if (q.size() > 0){
+            cond.signal();
         }
 
         mutex.unlock();
         return out;
     }
-    void readStall(){
-        _readStall=1;
-    }
-    void readUnstall(){
-        _readStall=0;
+
+    T peek(){
         mutex.lock();
-        cond.broadcast();//will this really work?
+
+        while(q.size() < 1 || _readStall){
+            cond.wait(mutex);
+        }
+
+        T out = q.back();
+
+        mutex.unlock();
+        return out;
+    }
+
+    std::vector<T> peekn(int n=1){
+        std::vector<T> out;
+        mutex.lock();
+        
+        while(q.size() < n || _readStall){
+            cond.wait(mutex);
+        }
+
+        std::reverse_iterator<typename std::deque<T>::iterator> it = q.rbegin();
+        for(int i = 0; i < n; i++){
+            out.push_back(q[q.size() - n + i]);
+        }
+
+        mutex.unlock();
+        return out;
+    }
+
+    void readStall(){
+        _readStall = 1;
+    }
+
+    void readUnstall(){
+        _readStall = 0;
+        mutex.lock();
+        cond.broadcast(); //Will this really work?
         mutex.unlock();
     }
 };

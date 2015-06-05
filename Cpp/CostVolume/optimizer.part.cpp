@@ -8,9 +8,11 @@
 #include "graphics.hpp"
 #include "set_affinity.h"
 #include "Cost.h"
+
 //relations: 
 //gwhatever=0.5*(gwhatever+ghere)
 //gright,gdown are negated
+
 using namespace std;
 using namespace cv;
 
@@ -31,15 +33,10 @@ typedef size_t st;
 #define QUIET_DTAM 0
 #include "quiet.hpp"
 
+void Cost::initOptimization(){ //must be thread safe in allocations(i.e. don't do any after first time!)
 
-
-
-
-
-void Cost::initOptimization(){//must be thread safe in allocations(i.e. don't do any after first time!)
-
-    int w=cols;
-    int h=rows;
+    int w = cols;
+    int h = rows;
     cacheGValues();
     cv::Mat loInd(rows,cols,CV_32SC1);
     cv::Mat loVal(rows,cols,CV_32FC1);
@@ -53,25 +50,23 @@ void Cost::initOptimization(){//must be thread safe in allocations(i.e. don't do
     _qx=0.0;
     _qy.create(h,w,CV_32FC1);
     _qy=0.0;
-    theta=thetaStart;
+    theta = thetaStart;
 }
 
 //This function has no equation, I had to derive it from the references
 void Cost::computeSigmas(){
     float lambda, alpha,gamma,delta,mu,rho,sigma;
-    float L=4.0;//lower is better(longer steps), but in theory only >=4 is guaranteed to converge
-    lambda=1.0/theta;
-    alpha=epsilon;
-    gamma=lambda;
-    delta=alpha;
-    mu=2.0*sqrt(gamma*delta)/L;
+    float L = 4.0;//lower is better(longer steps), but in theory only >=4 is guaranteed to converge
+    lambda = 1.0/theta;
+    alpha = epsilon;
+    gamma = lambda;
+    delta = alpha;
+    mu = 2.0*sqrt(gamma*delta)/L;
     
     rho= mu/(2.0*gamma);
-    sigma=mu/(2.0*delta);
+    sigma = mu/(2.0*delta);
     sigma_d = rho;
     sigma_q = sigma;
-
-
 }
 
 void Cost::cacheGValues(){
@@ -243,6 +238,7 @@ static void launch_optimzer_threads(const Cost* cost){
     pthread_create( &threadQD, NULL, Cost_optimizeQD, (void*) cost);
     pthread_create( &threadA, NULL, Cost_optimizeA, (void*) cost);
 }
+
 static void* Cost_optimizeQD(void* object){
     pthread_setname_np(pthread_self(),"QDthread");
     Cost* cost = (Cost*)object;
@@ -450,7 +446,7 @@ void Cost::optimizeA(){
         thetaStep=.97;
     }
     if (theta<thetaMin){//done optimizing!
-        running_a=false;
+        running_a = false;
         gpause();
 //         initOptimization();
         stableDepth=_d.clone();//always choose more regularized version

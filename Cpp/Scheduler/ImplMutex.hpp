@@ -7,6 +7,9 @@
 #  include <pthread.h>
 #endif
 
+/**
+ * An implementation of Mutex
+ */
 class ImplMutex
 {
     friend class ImplCondVar;//so ImplCondVar::Impl::wait can access
@@ -31,6 +34,9 @@ private:
 };
 
 
+/**
+ * An implementation of Condition Variable
+ */
 class ImplCondVar{
 public:
     ImplCondVar() { init(); }
@@ -52,14 +58,19 @@ public:
         ImplCondVar& operator = (const ImplCondVar& m);
 };
 
+/**
+ * Scope lock using Muxex, like the C++ RAII
+ */
 class ScopeLock{
     ImplMutex* m;
+
 public:
 ScopeLock(ImplMutex& mutex)
 {
-    m=&mutex;
+    m = &mutex;
     mutex.lock();
 }
+
 ~ScopeLock()
 {
     m->unlock();

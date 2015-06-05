@@ -116,6 +116,7 @@ public:
   void run();
 };
 
+// GLFW
 void reshape(GLFWwindow *, int width, int height) 
 {
 
@@ -171,8 +172,6 @@ void filterPoints( Eigen::Vector3f &cameraCenter , std::vector< Eigen::Vector3f 
 void computeStereoCorresp();
  
 void init3dViewer();
- 
-const static bool valgrind=0;
 
 void ptam( cv::Mat &frame , Eigen::Matrix4f &pose );
 
@@ -181,6 +180,8 @@ int App_main( int argc, char** argv );
 void myExit(){
     ImplThread::stopAllThreads();
 }
+
+const static bool valgrind = 0;
 
 int main( int argc, char** argv )
 {
@@ -211,6 +212,7 @@ int main( int argc, char** argv )
     std::cout<<"Starting main thread..."<<std::endl;
     mt.start();
 
+    // Like Pthread join, let the main thread wait for the threads to finish
     mt.wait();
     viewer.wait();    
      
@@ -927,6 +929,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
   QMatrix4x4 pose;
   
+  // Track the frame using PTAM
   projectData->mpTracker->TrackFrameCustom( 
           projectData->mimFrameBW , 
           projectData->mPtamData.mMessage ,  
@@ -944,11 +947,13 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
       // projectData->renderPTAMMessage();
   }
 
+  // Draw the trails if necessary
   if( trailPoints.size() > 0 )
   {
     drawTrailPoints( trailPoints , image );
   }
 
+  // Draw the tracked corner points
   if( trackedCorners.size() > 0 )
   {
       drawTrackedPoints( trackedCorners , image );
@@ -968,7 +973,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
     // projectData->mPtamData.mSkipFrame = true;
   }
 
-  // Draw 3d points  
+  // Draw 3d points after adding new KF
   if( projectData->mpMap->vpKeyFrames.size() > projectData->mPtamData.mPrevNumCams  )
   {
       
@@ -989,9 +994,9 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 	     projectData->mPtamData.mPtamInitialized = true;
       }
           
-      projectData->mPtamData.mPrevNumCams = projectData->mpMap->vpKeyFrames.size();
+      projectData->mPtamData.mPrevNumCams = projectData->mpMap->vpKeyFrames.size(); // Save old #KF
 
-      std::cout<<" Number of points and frames : "<< projectData->mpMap->vpPoints.size() <<" "<<projectData->mpMap->vpKeyFrames.size()<<std::endl;
+      std::cout<<" Number of PTAM points and Keyframes : "<< projectData->mpMap->vpPoints.size() <<" "<<projectData->mpMap->vpKeyFrames.size()<<std::endl;
      
       int numPoints = projectData->mpMap->vpPoints.size();
       
@@ -999,6 +1004,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
       double pt[ 3 ];
       
+      // Number of object points [w*h]
         if( objectPoints.size() > 200 )
   {
 
@@ -1016,10 +1022,12 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
 	//  std::cout<<K<<std::endl;
 
+    // Object points in homogeous
     Eigen::Vector4f objPtHmg( objectPoints[ 200 ][ 0 ] , objectPoints[ 200 ][ 1 ] , objectPoints[ 200 ][ 2 ] , 1.0 );
 
     Eigen::Vector3f projHmg = projMat * objPtHmg;
 
+    // Point on image in Pixel unit
     float xp = ( projHmg( 0 ) / projHmg( 2 ) );
     float yp = ( projHmg( 1 ) / projHmg( 2 ) );
 
@@ -1027,7 +1035,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
 
       for( int pp = 0; pp < numPoints; pp++ )
       {
-          TooN::Vector< 3 > v3Pos = projectData->mpMap->vpPoints[pp]->v3WorldPos;
+          TooN::Vector< 3 > v3Pos = projectData->mpMap->vpPoints[pp]->v3WorldPos; // World position
 
           points[ pp ]( 0 ) = v3Pos[ 0 ] ;
           points[ pp ]( 1 ) = v3Pos[ 1 ] ;
@@ -1038,10 +1046,13 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
           colors[ pp ]( 2 ) = 0;
       }
 
+    // Camera Center
     Eigen::Vector3f cameraCenter = -g_currentPose.block( 0 , 0 , 3 , 3 ).transpose() * g_currentPose.block( 0 , 3 , 3 , 1 );
       
+    // Filter points according to distance, points->filteredPoints
     filterPoints( cameraCenter , points , filteredPoints , g_minDistance , g_maxDistance );
     
+    // Set the renderer data of PTAM
     g_ptamSparseData->setData( filteredPoints , colors );
       
     if( numPoints > 0 )
@@ -1051,7 +1062,7 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
         g_ptamInitialized = true;
         g_ptamSparseData->resetCamera();
 
-        std::cout<<"PTAM init complete, now run DTAM!"<<std::endl;
+        std::cout<<"PTAM init complete, ready to run DTAM!"<<std::endl;
 
         // g_runDTAM = true;
       }
@@ -1069,6 +1080,9 @@ void runPtam( cv::Mat& image , ProjectData *projectData )
   }
 }
 
+/**
+ * Draw trail points(line) on the image
+ */
 void drawTrailPoints( std::vector< std::pair< QPoint, QPoint> > &points , cv::Mat &image )
 {
   int numTrailPoints = points.size();
@@ -1090,6 +1104,9 @@ void drawTrailPoints( std::vector< std::pair< QPoint, QPoint> > &points , cv::Ma
 }
 
 
+/**
+ * Draw fast corners on the image
+ */
 void rawFastCorners( std::vector< QPoint > &points , cv::Mat &image )
 {
    int numPoints = points.size();
@@ -1107,6 +1124,9 @@ void rawFastCorners( std::vector< QPoint > &points , cv::Mat &image )
    }
 }
 
+/**
+ * Draw tracked points on the image
+ */
 void drawTrackedPoints( vector< QPoint >& trackedPoints, Mat& image )
 {
     int numPoints = trackedPoints.size();
@@ -1124,6 +1144,10 @@ void drawTrackedPoints( vector< QPoint >& trackedPoints, Mat& image )
 }
 
 
+/*
+ * Compute color at [x,y] using Bilinear interpolation
+ * The result stores to color
+ */
 void imageValColored( float x , float y  , uchar *image , int stride , uchar color[ 3 ]  )
 {
     // Compute color using bilinear interpolation

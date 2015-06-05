@@ -313,7 +313,6 @@ void Tracker::TrackFrameCustom( Image< byte >& imFrame, QString& message, bool &
     } 
   else // If there is no map, try to make one.
     TrackForInitialMap( trails , message );
-  
 }
 //#endif
 

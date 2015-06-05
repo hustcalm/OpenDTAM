@@ -12,3 +12,9 @@ nbproject/
 *kate-swp*
 TOOLBOX_calib\ 2/
 testims/
+
+Cpp/Build/
+Cpp/dataset/
+Cpp/tags
+tags
+            

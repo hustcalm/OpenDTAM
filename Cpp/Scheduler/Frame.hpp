@@ -14,17 +14,18 @@ struct Frame{
     Mat relPose3d;
     
 //     //Ptr<Mat> CameraMatrix;
-    int reg2d;//2d registered?
-    int reg3d;//3d registered
-    int gt;//ground truth
-//     Mat pose;//the global pose
-    Ptr<Frame> parent;//the frame whose cv was used for registration
+    int reg2d; // 2d registered?
+    int reg3d; // 3d registered
+    int gt; // ground truth
+//     Mat pose; //the global pose
+    Ptr<Frame> parent; // the frame whose cv was used for registration, i.e. the reference frame
 //     vector<Ptr<CostVolume>> consumers;//the cost volumes using this image as inputs (non-base)
-    Ptr<CostVolume> cv;// the cost volume(if any) that uses this image as the base image
+    Ptr<CostVolume> cv; // the cost volume(if any) that uses this image as the base image
     Ptr<DepthmapDenoiseWeightedHuber> optimizer;
 //     Tracker tracker;
 //     vector<Mat> pyramid;
     Ptr<vector<Mat> > pyramid;
+
     Frame():fid(0),im(),gray(),R(),T(),relPose2d(),relPose3d(),reg2d(0),reg3d(0),gt(0),parent(),cv(),optimizer(),pyramid(){}
 };
 

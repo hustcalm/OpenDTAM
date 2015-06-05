@@ -60,10 +60,7 @@ class MapViewer;
 
 class ProjectData
 {
-
   public:
-  
-
 
   float mBarrelDistortion;
 
@@ -71,9 +68,6 @@ class ProjectData
   bool mNewFeatureDetectionMode , mIsPoseEstimated , mIsReadyForNextPose;
 
   bool mRunPTAM;
-
-  
-  
   
 //ptam dataset
 //#ifdef VE_UNIX
@@ -102,10 +96,6 @@ class ProjectData
   
   
 //   vtkSmartPointer< vtkPolyData > mSparsePoints , mSparsePointsNormals;
-  
-
-
-  
   
   bool mIsFirstFrame , mSpaceBarPressed , mResetPressed , mRenderMessage , mbGrabNextFrame;
 
@@ -136,8 +126,6 @@ class ProjectData
   ProjectData();
   
   virtual ~ProjectData();
-
-
 
 };
 
