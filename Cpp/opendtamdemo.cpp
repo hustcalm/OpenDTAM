@@ -242,10 +242,10 @@ int App_main( int argc, char** argv )
     d.setTo( cv::Scalar( 0 ) );
      
     // DSCF0195
-    //cap.open(DATASET_PATH);
+    cap.open(DATASET_PATH);
     
     // Logitec Pro9000
-    cap.open(DATASET_PATH_PRO9000);
+    //cap.open(DATASET_PATH_PRO9000);
 
     if( !cap.isOpened() )
     {
